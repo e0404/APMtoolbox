@@ -1,5 +1,5 @@
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Analytical Probabilistic Modelling 1D depth dose profile example for the physical dose
+% Analytical Probabilistic Modelling of a 1D depth dose profile for the physical dose
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -8,7 +8,7 @@
 %
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%
-clc,clear%,close all
+clc,clear
 addpath('utils');
 SG       = @(qX,qW,qMu,qSigma)((qW/(sqrt(2*pi*(qSigma^2)))).*exp(-((qX-qMu).^2)./(2*(qSigma^2))));
 MG       = @(X,MU,SIGMA)((1./((2*pi)^(3/2) .* sqrt(det(SIGMA)))).*exp(-.5 *(X-MU)*(SIGMA)^-1 *(X-MU)'));
@@ -36,7 +36,6 @@ Voxel.penalty(Voxel.ixNT)  = 10;
 Voxel.penalty(Voxel.ixT)   = 5000;
 
 %% fill spot related variables
-
 load(['protons_GenericAPM.mat']);
 availablePeakPos           = [machine.data.peakPos]; 
 availableranges            = [machine.data.range];
@@ -85,12 +84,6 @@ else
 end
 
 %% calculate nominal and expected dose influence data
-
-dij.totalNumOfBixels = Spot.numOfSpots;
-dij.numOfScenarios   = 1;
-dij.numOfVoxels      = Voxel.numOfVoxel;
-dij.dimensions       = [Voxel.numOfVoxel 1 1];
-dij.numOfBeams       = numOfBeams;
 dij.physicalDose     = spalloc(Voxel.numOfVoxel,Spot.numOfSpots,1);
 dij.physicalDoseExp  = spalloc(Voxel.numOfVoxel,Spot.numOfSpots,1);
 vSpotRange           = zeros(Spot.numOfSpots,1); 
@@ -132,7 +125,7 @@ for i = 1:1:Voxel.numOfVoxel
    
    for l = i; %i:1:Voxel.numOfVoxel
       
-      PSI_ijlm = dij.physicalDoseExp(i,:)' * dij.physicalDoseExp(i,:);
+      PSI_ijlm = dij.physicalDoseExp(i,:)' * dij.physicalDoseExp(l,:);
       
       for j = 1:Spot.numOfSpots
          
@@ -142,7 +135,6 @@ for i = 1:1:Voxel.numOfVoxel
          Dev_J      = radDepth(i,Spot.ixBeam(j)) - baseEntryJ.Z.mean;
          
          for m = j:Spot.numOfSpots
-            
             if mSysCovRadDept(j,m) > 0 || mRndCovRadDepth(j,m) > 0 
                
                baseEntryM = machine.data(Spot.ixEnergy(m));
@@ -175,6 +167,7 @@ for i = 1:1:Voxel.numOfVoxel
 end
 close(f)
 
+% perform probabilistic optimization
 Voxel.presDose(Voxel.ixNT) = 0;
 w0         = 0.01 * ones(Spot.numOfSpots,1);
 options    = optimoptions('fmincon','Display','iter-detailed','GradObj','on');
@@ -190,39 +183,7 @@ std_d_rob = zeros(Voxel.numOfVoxel,1);
 f = waitbar(0,'Please wait...');
 for i = 1:1:Voxel.numOfVoxel
    
-   l = i;
-   
-   PSI_ijlm = dij.physicalDoseExp(i,:)' * dij.physicalDoseExp(i,:);
-   
-   for j = 1:Spot.numOfSpots
-      
-      baseEntryJ = machine.data(Spot.ixEnergy(j));
-      SigmaSq_J  = baseEntryJ.Z.width.^2;
-      Weight_J   = baseEntryJ.Z.weight;
-      Dev_J      = radDepth(i,Spot.ixBeam(j)) - baseEntryJ.Z.mean;
-      
-      for m = j:Spot.numOfSpots
-         
-         if mSysCovRadDept(j,m) > 0 || mRndCovRadDepth(j,m) > 0
-            
-            baseEntryM = machine.data(Spot.ixEnergy(m));
-            SigmaSq_M  = baseEntryM.Z.width.^2;
-            Weight_M   = baseEntryM.Z.weight;
-            Dev_M      = radDepth(l,Spot.ixBeam(m)) - baseEntryM.Z.mean;
-            
-            vLaSi11 = SigmaSq_J + mSysCovRadDept(j,j) + mRndCovRadDepth(j,j);
-            vLaSi22 = SigmaSq_M + mSysCovRadDept(m,m) + mRndCovRadDepth(m,m);
-            vLaSi12 = mSysCovRadDept(j,m);
-            vLaSi21 = mSysCovRadDept(m,j);
-            
-            PSI_ijlm(j,m) = calcSecRangeMom(vLaSi11,vLaSi22,vLaSi12,vLaSi21,Dev_J,Dev_M,Weight_J,Weight_M);
-            PSI_ijlm(m,j) = PSI_ijlm(j,m);
-            
-         end
-      end
-   end
-   
-   std_d_rob(i) = (sqrt((wRob'* PSI_ijlm * wRob) - doseExpRob(i)^2));
+   std_d_rob(i) = (sqrt((wRob'* squeeze(mCovariance(i,i,:,:)) * wRob) - doseExpRob(i)^2));
    waitbar(i/Voxel.numOfVoxel,f,'Calculating (co)-variance...');
    
 end
@@ -240,7 +201,6 @@ h = waitbar(0,'Please wait...');
 mSampDose    = zeros(Voxel.numOfVoxel,sampleRuns);
 mSampDoseRob = zeros(Voxel.numOfVoxel,sampleRuns);
 
-
 for ixSample = 1:sampleRuns
    
     mSample = zeros(Voxel.numOfVoxel,Spot.numOfSpots);
@@ -256,6 +216,7 @@ for ixSample = 1:sampleRuns
     waitbar(ixSample/sampleRuns,h,'Sampling ...');
     
 end
+
 close(h)
 doseExp_samp    = mean(mSampDose,2);
 std_d_samp      = std(mSampDose,1,2);
@@ -287,7 +248,7 @@ xlabel('[mm]','Interpreter','Latex'),ylabel('dose [Gy]','Interpreter','Latex'),
 grid on, set(gca,'FontSize',16),
 title('SOBP protons - conventional optimization','Interpreter','Latex','FontSize',20);
 legend([hNom hExp hStd],{'[d]','E[d] ','$\sigma[d]$  '},'Interpreter','Latex','FontSize',20);
-
+ax = gca; ax.LineWidth = 2;
 
 subplot(122),p  = patch(boxTargetX,boxTargetY,[.8 .8 .8]);set(p,'FaceAlpha',0.35,'LineStyle','none'),hold on;box on,
 for j = 1:Spot.numOfSpots    
@@ -307,3 +268,4 @@ xlabel('[mm]','Interpreter','Latex'),ylabel('dose [Gy]','Interpreter','Latex'),
 grid on,set(gca,'FontSize',16),
 title('SOBP protons - probabilistic optimization','Interpreter','Latex','FontSize',20);
 legend([hNom hExp hStd],{'[d]','E[d]','$\sigma[d]$  '},'Interpreter','Latex','FontSize',20);
+ax = gca; ax.LineWidth = 2;
