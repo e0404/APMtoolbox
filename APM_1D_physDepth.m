@@ -101,7 +101,6 @@ for j = 1:Spot.numOfSpots
    
 end
 
-
 w0       = ones(Spot.numOfSpots,1);
 options  = optimoptions('fmincon','Display','iter-detailed','GradObj','on');
 func     = @(x) obFunc(dij,Voxel,x);
