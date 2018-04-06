@@ -15,8 +15,9 @@ This toolbox presents the basic prinicples of analytical probabilistic modeling 
 ## 1D physical depth dose of protons
 ![Alt text](https://github.com/e0404/APMtoolbox/blob/master/pics/APM_1D_physDepth.png?raw=true "1D physical depth dose")
 
+## 1D RBE weighted depth dose of carbon ions
+![Alt text](https://github.com/e0404/APMtoolbox/blob/master/pics/APM_1D_bioDepth.png?raw=true "1D physical depth dose")
+
 ## 1D arbitrary physical lateral dose
 ![Alt text](https://github.com/e0404/APMtoolbox/blob/master/pics/APM_1D_lateral.png?raw=true "1D physical lateral dose")
 
-## 1D RBE weighted depth dose of carbon ions
-![Alt text](https://github.com/e0404/APMtoolbox/blob/master/pics/APM_1D_bioDepth.png?raw=true "1D physical depth dose")
