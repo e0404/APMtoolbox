@@ -36,7 +36,8 @@ classdef apm_probPieceWiseSquaredOverdose
             
             %fGradMu = obj.p/numel(expDose) * arrayfun(@(mu,sig) 2*mu * obj.standardnormcdf(mu/sig) + mu*sig^2*obj.zeronormpdf(mu,sig),expDose,stdDose);           
             %fGradMu = obj.p/numel(expDose) * arrayfun(@(mu,sig) obj.zeronormpdf(mu,sig)*sig^2 + mu*erfc(-mu/(sqrt(2)*sig)),expDose,stdDose);
-            fGradMu = obj.p/numel(expDose) * arrayfun(@(mu,sig)  mu + 2*obj.zeronormpdf(mu,sig)*sig^2 + mu*erf(mu/sqrt(2*sig^2)),muTransMax,stdDose);
+            %fGradMu = obj.p/numel(expDose) * arrayfun(@(mu,sig)  mu + 2*obj.zeronormpdf(mu,sig)*sig^2 + mu*erf(mu/sqrt(2*sig^2)),muTransMax,stdDose);
+            fGradMu = 2 * obj.p/numel(expDose) * arrayfun(@(mu,sig) sig^2*obj.zeronormpdf(mu,sig) + mu*obj.standardnormcdf(mu / sig),muTransMax,stdDose);
       
         end
         
@@ -48,7 +49,11 @@ classdef apm_probPieceWiseSquaredOverdose
         
         function fGradVar = gradientVarDose(obj,expDose,varDose)
             muTransMax = expDose - obj.dMax;
-            fGradVar = obj.p/numel(expDose) * arrayfun(@(mu,sig) obj.standardnormcdf(mu/sig) + mu^3 * obj.zeronormpdf(mu,sig) /(2*sig),muTransMax,sqrt(varDose));
+            %fGradVar = obj.p/numel(expDose) * arrayfun(@(mu,sig) obj.standardnormcdf(mu/sig) + mu^3 * obj.zeronormpdf(mu,sig) /(2*sig),muTransMax,sqrt(varDose));
+            %fGradVar = obj.p/numel(expDose) * arrayfun(@(mu,sig) obj.standardnormcdf(mu/sig) + mu^3 * obj.zeronormpdf(mu,sig) /(sig),muTransMax,sqrt(varDose));
+            %fGradVar = obj.p/numel(expDose) * arrayfun(@(mu,sig) obj.standardnormcdf(mu/sig) + mu^3 * obj.zeronormpdf(mu,sig) /(sig),muTransMax,sqrt(varDose));
+            %fGradVar = obj.p/numel(expDose) * arrayfun(@(mu,sig) obj.standardnormcdf(mu/sig) + mu^3 * obj.zeronormpdf(mu,sig)/sig^2 + mu * obj.zeronormpdf(mu,sig),muTransMax,sqrt(varDose));
+            fGradVar = obj.p/numel(expDose) * arrayfun(@(mu,sig) obj.standardnormcdf(mu/sig),muTransMax,sqrt(varDose));
         end
         
     end
