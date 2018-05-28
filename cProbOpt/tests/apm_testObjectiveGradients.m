@@ -11,8 +11,8 @@ nVars=4;
 
 k = -10;
 %cObj = apm_probEudMaxQuantileConstraint(1,k,0.5);
-%fObj = apm_probPieceWiseSquaredOverdose(1,0.3);
-fObj = apm_probPieceWiseSquaredUnderdose(1,0.7);
+fObj = apm_probPieceWiseSquaredOverdose(1,0.5);
+%fObj = apm_probPieceWiseSquaredUnderdose(1,0.7);
 %fObj = apm_probDvh
 
 expDose = rand(nVars,1);
@@ -57,18 +57,23 @@ for i=1:nVars
         fDerivEst(step) = muGrad_tmp_est(i);
     end
     
-    plot(expDoseSpace,fSteps);hold on;
-    plot(expDoseSpace(ix),fSteps(ix),'ko');
-    tangent = fDeriv(ix) * (expDoseSpace - expDoseSpace(ix)) + fSteps(ix);
-    tangent_est = fDerivEst(ix) * (expDoseSpace - expDoseSpace(ix)) + fSteps(ix);
-    plot(expDoseSpace,tangent);
-    plot(expDoseSpace,tangent_est,'--');
-    xlim([min(expDoseSpace) max(expDoseSpace)]);
+    fNumGrad = gradient(fSteps,expDoseSpace);
     
+    
+    %plot(expDoseSpace,fSteps);hold on;
+    %plot(expDoseSpace(ix),fSteps(ix),'ko');
+    %tangent = fDeriv(ix) * (expDoseSpace - expDoseSpace(ix)) + fSteps(ix);
+    %tangent_est = fDerivEst(ix) * (expDoseSpace - expDoseSpace(ix)) + fSteps(ix);
+    %plot(expDoseSpace,tangent);
+    %plot(expDoseSpace,tangent_est,'--');
+    %xlim([min(expDoseSpace) max(expDoseSpace)]);
+    plot(expDoseSpace,fNumGrad); hold on;
+    plot(expDoseSpace,fDeriv);
     
     drawnow();
     %waitforbuttonpress;
 end
+
 
 hf = figure;
 
@@ -94,11 +99,16 @@ for i = 1:nVars
             fDeriv(step) = covGrad_tmp(i,l);
         end
         
-        plot(space_tmp,fSteps);hold on;
-        plot(space_tmp(ix),fSteps(ix),'ko');
-        tangent = fDeriv(ix) * (space_tmp - space_tmp(ix)) + fSteps(ix);
+        %plot(space_tmp,fSteps);hold on;
+        %plot(space_tmp(ix),fSteps(ix),'ko');
+        %tangent = fDeriv(ix) * (space_tmp - space_tmp(ix)) + fSteps(ix);
         %tangent_est = cDerivEst(ix) * (space_tmp - space_tmp(ix)) + cSteps(ix);
-        plot(space_tmp,tangent);
+        %plot(space_tmp,tangent);
+        fNumGrad = gradient(fSteps,space_tmp);
+        plot(space_tmp,fNumGrad); hold on;
+        plot(space_tmp,fDeriv);
+        
+        
         %plot(space_tmp,tangent_est,'--');
         drawnow();
         %waitforbuttonpress;
