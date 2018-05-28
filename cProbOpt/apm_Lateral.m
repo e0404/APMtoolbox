@@ -35,87 +35,23 @@ latCutOff = 3;
 tikzFolder = 'tikz/'; %Local tikz folder
 
 %Spot info
-spotDistance = 2;
-n = 20;
+spotDistance = 5;
 % some parameters we need
 highResFac = 5;
-lowResFac = 5;
 fSize = 14;
-plotLim1 = 0;%lim1 - 5*sqrt(max(sigma.^2+sigmaS^2));
-plotLim2 = (n+1)*spotDistance;%lim2 + 5*sqrt(max(sigma.^2+sigmaS^2));
-xLim1 = plotLim1+spotDistance;
-xLim2 = plotLim2-spotDistance;
-x = linspace(plotLim1,plotLim2,highResFac*n)';
 
-vois = struct();
-%Target
-vois(1).xL = (xLim1+xLim2)/2 - 5*spotDistance;
-vois(1).xU = (xLim1+xLim2)/2 + 5*spotDistance;
-vois(1).dPres = 1;
-vois(1).dObjMin = 1;
-vois(1).dObjMax = 1;
-vois(1).p = 5000;
-vois(1).name = 'TARGET';
-vois(1).type = 'TARGET';
-vois(1).faceColor = targetColor;
-vois(1).dvhColor = dvhTargetColor;
-vois(1).eudK = -20;
+nVox = 100;
+res = 1; %[mm]
 
-%OAR
-vois(2).xL = (xLim1+xLim2)/2 + 5*spotDistance;
-vois(2).xU = vois(2).xL + 5*spotDistance;
-vois(2).dPres = 0;
-vois(2).dObjMin = 0;
-vois(2).dObjMax = 0.6;%0.4; %0.6; %0.5;
-vois(2).p = 200;
-vois(2).name = 'OAR';
-vois(2).type = 'OAR';
-vois(2).faceColor = oarColor;
-vois(2).dvhColor = dvhOarColor;
-vois(2).eudK = 5.5;
+[x,vois] = apm_createAnatomy1D(nVox,res,0.5,0.25);
 
-nVois = numel(vois);
+xLim1 = x(1);
+xLim2 = x(end);
 
-xLowRes = linspace(plotLim1,plotLim2,lowResFac*n)';
-allVoiIx = [];
+mu = apm_setLateralBeamletGrid(x,vois,spotDistance,3*spotDistance);
+n = numel(mu);
 
-for v = 1:nVois
-    vois(v).ixLowRes = and(xLowRes <= vois(v).xU,xLowRes >= vois(v).xL);
-    vois(v).xLowRes = x(vois(v).ixLowRes);
-    vois(v).ix = and(x <= vois(v).xU,x >= vois(v).xL);
-    allVoiIx = [allVoiIx vois(v).ix];
-    vois(v).x = x(vois(v).ix);
-      
-    vois(v).objFunc = cell(0,0);
-    vois(v).cFunc = cell(0,0);
-end
-
-allVoiIx = any(allVoiIx,2);
-allVoiX = x(allVoiIx);
-bodyIx = 1:numel(x);
-
-vois(3).dPres = 0;
-vois(3).dObjMin = 0;
-vois(3).dObjMax = 0.6;
-vois(3).p = 1;
-vois(3).name = 'BODY';
-vois(3).type = 'BODY';
-vois(3).ix = ~allVoiIx;
-vois(3).x = x(vois(3).ix);
-vois(3).objFunc = cell(0,0);
-vois(3).cFunc = cell(0,0);
-vois(3).eudK = 1;
-
-
-% sample parameters of mixtures 
-%n     = floor((xLim2-xLim1)/spotDistance);
-lim1  = 0;
-lim2  = 3*n;
-mu    = linspace(xLim1,xLim2,n)';
 wStart     = ones(n,1);%4*rand(n,1)+2;
-%w     = 1*ones(1,n);%
-%sigma = rand(n,1)+3;
-%sigma  = 3.761*ones(1,n);
 sigma = 2.5*ones(1,n);
 mode = 'perfect';
 
@@ -161,15 +97,15 @@ end
 calcDose = @(dij,w) dij*w;
 calcExpDose = @(edij,w) edij*w;
 
-dose_ij = ones(n*highResFac,1) ./ sqrt( 2*pi*ones(n*highResFac,1)*sigma.^2) .* exp( - ( bsxfun(@minus,ones(n*highResFac,1)*mu',x).^2 ) ./ ( 2*ones(n*highResFac,1)*sigma.^2) );
+dose_ij = ones(nVox,1) ./ sqrt( 2*pi*ones(nVox,1)*sigma.^2) .* exp( - ( bsxfun(@minus,ones(nVox,1)*mu',x).^2 ) ./ ( 2*ones(nVox,1)*sigma.^2) );
 
 sigmaAddSqr = sigma.^2 + diag(C_S)' + diag(C_R)';
 
-expDose_ij = 1./sqrt( 2*pi*ones(n*highResFac,1)*sigmaAddSqr) .* exp( - ( bsxfun(@minus,ones(n*highResFac,1)*mu',x).^2 ) ./ ( 2*ones(n*highResFac,1)*sigmaAddSqr) );
+expDose_ij = 1./sqrt( 2*pi*ones(nVox,1)*sigmaAddSqr) .* exp( - ( bsxfun(@minus,ones(nVox,1)*mu',x).^2 ) ./ ( 2*ones(nVox,1)*sigmaAddSqr) );
 
 stdDose = NaN*x;
 
-xStar  = mean([plotLim1 plotLim2])+.3*rand*(plotLim2-plotLim1);
+xStar  = mean([xLim1 xLim2])+.3*rand*(xLim2-xLim1);
 
 varInfluenceSys = zeros(highResFac*n,n,n);
 varInfluenceRand = zeros(highResFac*n,n,n);
@@ -383,8 +319,8 @@ switch obj
         error(['Objective ''' obj ''' not implemented!']);
 end
 %constr = 'meanMax';
-constr = 'EUDmax';
-%constr = 'DVHmin';
+%constr = 'EUDmax';
+constr = 'DVHmin';
 %constr = 'DVHmax';
 
 switch constr
@@ -554,7 +490,7 @@ end
 
 %figure(1)
 %hold on
-%plot(axProfile,x,repmat(w',n*highResFac,1).*dose_ij,'b--')
+%plot(axProfile,x,repmat(w',nVox,1).*dose_ij,'b--')
 plot(axProfile,x,dose,'Color',nomDoseColor,'LineWidth',2,'LineStyle','--')
 
 plot(axProfile,x,expDose,'Color',expDoseColor,'LineWidth',2,'LineStyle','--')
@@ -804,7 +740,7 @@ end
 plot(axProfile,x,doseProb,'Color',nomDoseColor,'LineStyle','-','LineWidth',2);
 plot(axProfile,x,expDoseProb,'Color',expDoseColor,'LineStyle','-','LineWidth',2);
 plot(axProfile,x,stdDoseProb,'Color',stdDoseColor,'LineStyle','-','LineWidth',2);
-%plot(axProfile,x,repmat(wProb',n*highResFac,1).*dose_ij,'b-.','LineWidth',1);
+%plot(axProfile,x,repmat(wProb',nVox,1).*dose_ij,'b-.','LineWidth',1);
 
 if ~exist('hAxProbDvh','var') || ~isvalid(hAxProbDvh)
     hFigProbDvh = figure;
