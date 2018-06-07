@@ -1,7 +1,12 @@
-function muPos = apm_setLateralBeamletGrid(x,vois,spacing,expand)
-    if nargin < 4
+function spots = apm_setLateralBeamletGrid(x,vois,sigma,spacing,expand,relSigmaNoise)
+    if nargin < 5 || isempty(expand)
         expand = spacing;
     end
+    
+    if nargin < 6
+        relSigmaNoise = 0;
+    end
+    
     xL = +Inf;
     xU = -Inf;
     for v = 1:numel(vois)
@@ -22,6 +27,8 @@ function muPos = apm_setLateralBeamletGrid(x,vois,spacing,expand)
         xU = x(end);
     end
     
-    muPos = transpose(xL:spacing:xU);    
+    muCell = num2cell(transpose(xL:spacing:xU));
+    
+    spots = struct('mu',muCell,'sigma', num2cell(sigma*(ones(numel(muCell),1) + relSigmaNoise*sigma*randn(numel(muCell),1))));
 end
 

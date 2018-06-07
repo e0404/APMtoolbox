@@ -69,6 +69,8 @@ vois(3).x = x(vois(3).ix);
 vois(3).objFunc = cell(0,0);
 vois(3).cFunc = cell(0,0);
 vois(3).eudK = 1;
+vois(3).faceColor = 'none';
+vois(3).dvhColor = [0 0 0];
 
 end
 

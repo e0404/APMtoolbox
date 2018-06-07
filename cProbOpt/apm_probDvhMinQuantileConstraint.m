@@ -189,6 +189,11 @@ classdef apm_probDvhMinQuantileConstraint
             if nargin > 1
                 x = (mu-x)./sig;
             end
+            
+            if ~isreal(x)
+                x = real(x);
+            end
+            
             out = 0.5*erfc(x/sqrt(2));
         end        
     end
