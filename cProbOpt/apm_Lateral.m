@@ -17,17 +17,18 @@ fullCovariance = true;
 sampleValidation = false;
 
 separateDVHplots = false;
+dvhPlotMode = 'tripleband';
 
 %Anatomy
 nVox = 100;
 res = 1; %[mm]
-relativeTargetSize = 0.5;
+relativeTargetSize = 0.4;
 relativeOARSize = 0.2;
 
 %Irradiation geometry
-spotDistance = 4; %Spot Spacing
-spotWidth = 3.5; 
-nFrac = 30; % Number of Fractions
+spotDistance = 3; %Spot Spacing
+spotWidth = 5; 
+nFrac = 5; % Number of Fractions
 
 
 
@@ -48,8 +49,8 @@ figure;
 axProfile = axes();%axes('Position',get(axHist,'Position'),'ActivePositionProperty','Position');
 apm_anatomyPlot(axProfile,x,vois);
 
-%spots = apm_setLateralBeamletGrid(x,vois,2.5,spotDistance,3*spotDistance);
-spots = apm_setLateralBeamletGrid(x,vois,2.5,spotDistance,3*spotDistance,0.05); %adds noise to the spot width
+spots = apm_setLateralBeamletGrid(x,vois,2.5,spotDistance,3*sqrt(sigmaR^2 + sigmaS^2));
+%spots = apm_setLateralBeamletGrid(x,vois,2.5,spotDistance,3*sqrt(sigmaR^2 + sigmaS^2),0.05); %adds noise to the spot width
 
 nSpots = numel(spots);
 xLim1 = x(1);
@@ -141,6 +142,7 @@ end
 obj = 'pwSqDev';
 %obj = 'sqDev';
 constr = 'DVHmin';
+%constr = '';
 
 
 %Set a default constraint set via helper function
@@ -189,80 +191,11 @@ hold(axDVH,'on');
 grid(axDVH,'on');
 
 for v = 1:numel(vois)
-    dvhs{v} = apm_DVH(dose(vois(v).ix),100,1.1);
-    plot(dvhs{v}(1,:),dvhs{v}(2,:),'LineWidth',2,'LineStyle','--','Color',vois(v).dvhColor);
-    dvhsProb{v} = apm_DVH(doseProb(vois(v).ix),100,1.1);
-    [expDvhs{v},stdDvhs{v}] = apm_DVHprob(expDose(vois(v).ix),covDose(vois(v).ix,vois(v).ix),100,1.1,'int_gauss');
-    plot(axDVH,expDvhs{v}(1,:),expDvhs{v}(2,:),'LineWidth',2,'LineStyle','-','Color',vois(v).dvhColor);
-    axDVH.ColorOrderIndex = axDVH.ColorOrderIndex - 1;
-    plot(axDVH,expDvhs{v}(1,:),expDvhs{v}(2,:)+stdDvhs{v}(2,:),'LineWidth',1,'LineStyle','-.','Color',vois(v).dvhColor);
-    axDVH.ColorOrderIndex = axDVH.ColorOrderIndex - 1;
-    plot(axDVH,expDvhs{v}(1,:),expDvhs{v}(2,:)-stdDvhs{v}(2,:),'LineWidth',1,'LineStyle','-.','Color',vois(v).dvhColor);
-end
-
-
-switch constr
-    case 'DVHmin'
-        plot(dvhDparam,dvhMinVol,'^k','MarkerFaceColor','k');
-    case 'DVHmax'
-        plot(dvhDparam,dvhMaxVol,'vk','MarkerFaceColor','k');
-    case 'minDose'
-        plot([minDose minDose],[0 1],'--k<','MarkerFaceColor','k');
-        [minDoseMu,minDoseStd] = apm_eudProb(expDose(vois(1).ix),covDose(vois(1).ix,vois(1).ix),-100);
-        tmp_d = linspace(0,1.1,100);
-        tmp_gauss = 1/sqrt(2*pi*minDoseStd^2) * exp(-0.5*(tmp_d-minDoseMu).^2 ./ minDoseStd^2);
-        tmp_gauss = 0.5 * tmp_gauss / max(tmp_gauss);
-        plot(tmp_d,tmp_gauss,':','Color',0.5*[1 1 1]);
-        plot([minDose minDose],[0 max(tmp_gauss)],'--k<','MarkerFaceColor','k');
-        plot([min(dose(vois(1).ix)) min(dose(vois(1).ix))],[0 max(tmp_gauss)],':','Color',0.5*[1 1 1]);
-    case 'maxDose'
-        plot([maxDose maxDose],[0 1],'--k<','MarkerFaceColor','k');
-        [maxDoseMu,maxDoseStd] = apm_eudProb(expDose(vois(2).ix),covDose(vois(2).ix,vois(2).ix),100);
-        tmp_d = linspace(0,1.1,100);
-        tmp_gauss = 1/sqrt(2*pi*maxDoseStd^2) * exp(-0.5*(tmp_d-maxDoseMu).^2 ./ maxDoseStd^2);
-        tmp_gauss = 0.5 * tmp_gauss / max(tmp_gauss);
-        plot(tmp_d,tmp_gauss,'Color',0.5*[1 1 1]);
-        plot([maxDose maxDose],[0 max(tmp_gauss)],'--k<','MarkerFaceColor','k');
-        plot([max(dose(vois(2).ix)) max(dose(vois(2).ix))],[0 max(tmp_gauss)],':','Color',0.5*[1 1 1]);
-    case 'EUDmin'
-        [minEudMu,minEudStd] = apm_eudProb(expDose(vois(1).ix),covDose(vois(1).ix,vois(1).ix),eudK);
-        plot([minDose minDose],[0 1],'--k<','MarkerFaceColor','k');
-        tmp_d = linspace(0,1.1,100);
-        tmp_gauss = 1/sqrt(2*pi*minEudStd^2) * exp(-0.5*(tmp_d-minEudMu).^2 ./ minEudStd^2);
-        tmp_gauss = 0.5 * tmp_gauss / max(tmp_gauss);
-        plot(tmp_d,tmp_gauss,'Color',0.5*[1 1 1]);
-        plot([eudMin eudMin],[0 max(tmp_gauss)],'-k>','MarkerFaceColor','k');
-    case 'EUDmax'
-        [maxEudMu,maxEudStd] = apm_eudProb(expDose(vois(2).ix),covDose(vois(2).ix,vois(2).ix),vois(2).eudK);
-        
-        plot([minDose minDose],[0 1],'--k<','MarkerFaceColor','k');
-        tmp_d = linspace(0,1.1,100);
-        tmp_pVal = maxEudMu + maxEudStd*sqrt(2)*erfinv(2*eudMaxProbability - 1);
-        [~, tmp_ix ] = min( abs( tmp_d-tmp_pVal ) );
-        
-        tmp_gauss = 1/sqrt(2*pi*maxEudStd^2) * exp(-0.5*(tmp_d-maxEudMu).^2 ./ maxEudStd^2);
-        tmp_gauss = 0.5 * tmp_gauss / max(tmp_gauss);
-        plot(tmp_d,tmp_gauss,'Color',0.5*[1 1 1]);
-        plot([eudMax eudMax],[0 tmp_gauss(tmp_ix)],'-k<','MarkerFaceColor','k');  
-        nomEud = apm_eud(dose(vois(2).ix),vois(2).eudK);
-        plot(nomEud,0,'k*','MarkerFaceColor','k');
-    case 'meanMax'
-        [maxEudMu,maxEudStd] = apm_eudProb(expDose(vois(2).ix),covDose(vois(2).ix,vois(2).ix),1);
-        plot([minDose minDose],[0 1],'--k<','MarkerFaceColor','k');       
-        tmp_d = linspace(0,1.1,100);
-        tmp_pVal = maxEudMu + maxEudStd*sqrt(2)*erfinv(2*eudMaxProbability - 1);
-        [~, tmp_ix ] = min( abs( tmp_d-tmp_pVal ) );
-        tmp_gauss = 1/sqrt(2*pi*maxEudStd^2) * exp(-0.5*(tmp_d-maxEudMu).^2 ./ maxEudStd^2);
-        tmp_gauss = 0.5 * tmp_gauss / max(tmp_gauss);
-        plot(tmp_d,tmp_gauss,'Color',0.5*[1 1 1]);
-        plot([eudMax eudMax],[0 tmp_gauss(tmp_ix)],'-k<','MarkerFaceColor','k');
-        nomEud = apm_eud(dose(vois(2).ix),1);
-        plot(nomEud,0,'k*','MarkerFaceColor','k');
-    otherwise        
-end
- 
-if contains(obj,'pwSqDev')
-    plot([vois(2).probObjFunc{1}.dMax vois(2).probObjFunc{1}.dMax],[0 1],'--k<','MarkerFaceColor','k');
+    %dvhs{v} = apm_DVH(dose(vois(v).ix),100,1.1);
+    plot(axDVH,vois(v).nomDVH(1,:),vois(v).nomDVH(2,:),'LineWidth',0.5,'LineStyle','--','Color',vois(v).dvhColor);
+    %dvhsProb{v} = apm_DVH(doseProb(vois(v).ix),100,1.1);
+    %[expDvhs{v},stdDvhs{v}] = apm_DVHprob(expDose(vois(v).ix),covDose(vois(v).ix,vois(v).ix),100,1.1,'int_gauss');
+    apm_plotProbDVH(axDVH,vois(v).expDVH,vois(v).stdDVH,vois(v).dvhColor,{'-','-.'},dvhPlotMode);
 end
 
 box(axDVH,'on');
@@ -270,6 +203,74 @@ ylim(axDVH,[0 1]);
 xlim(axDVH,[0 1.1]);
 xlabel(axDVH,'rel. dose');
 ylabel(axDVH,'rel. volume');
+
+apm_plotObjConstrInDVH(axDVH,vois,false);
+
+% switch constr
+%     case 'DVHmin'
+%         plot(dvhDparam,dvhMinVol,'^k','MarkerFaceColor','k');
+%     case 'DVHmax'
+%         plot(dvhDparam,dvhMaxVol,'vk','MarkerFaceColor','k');
+%     case 'minDose'
+%         plot([minDose minDose],[0 1],'--k<','MarkerFaceColor','k');
+%         [minDoseMu,minDoseStd] = apm_eudProb(expDose(vois(1).ix),covDose(vois(1).ix,vois(1).ix),-100);
+%         tmp_d = linspace(0,1.1,100);
+%         tmp_gauss = 1/sqrt(2*pi*minDoseStd^2) * exp(-0.5*(tmp_d-minDoseMu).^2 ./ minDoseStd^2);
+%         tmp_gauss = 0.5 * tmp_gauss / max(tmp_gauss);
+%         plot(tmp_d,tmp_gauss,':','Color',0.5*[1 1 1]);
+%         plot([minDose minDose],[0 max(tmp_gauss)],'--k<','MarkerFaceColor','k');
+%         plot([min(dose(vois(1).ix)) min(dose(vois(1).ix))],[0 max(tmp_gauss)],':','Color',0.5*[1 1 1]);
+%     case 'maxDose'
+%         plot([maxDose maxDose],[0 1],'--k<','MarkerFaceColor','k');
+%         [maxDoseMu,maxDoseStd] = apm_eudProb(expDose(vois(2).ix),covDose(vois(2).ix,vois(2).ix),100);
+%         tmp_d = linspace(0,1.1,100);
+%         tmp_gauss = 1/sqrt(2*pi*maxDoseStd^2) * exp(-0.5*(tmp_d-maxDoseMu).^2 ./ maxDoseStd^2);
+%         tmp_gauss = 0.5 * tmp_gauss / max(tmp_gauss);
+%         plot(tmp_d,tmp_gauss,'Color',0.5*[1 1 1]);
+%         plot([maxDose maxDose],[0 max(tmp_gauss)],'--k<','MarkerFaceColor','k');
+%         plot([max(dose(vois(2).ix)) max(dose(vois(2).ix))],[0 max(tmp_gauss)],':','Color',0.5*[1 1 1]);
+%     case 'EUDmin'
+%         [minEudMu,minEudStd] = apm_eudProb(expDose(vois(1).ix),covDose(vois(1).ix,vois(1).ix),eudK);
+%         plot([minDose minDose],[0 1],'--k<','MarkerFaceColor','k');
+%         tmp_d = linspace(0,1.1,100);
+%         tmp_gauss = 1/sqrt(2*pi*minEudStd^2) * exp(-0.5*(tmp_d-minEudMu).^2 ./ minEudStd^2);
+%         tmp_gauss = 0.5 * tmp_gauss / max(tmp_gauss);
+%         plot(tmp_d,tmp_gauss,'Color',0.5*[1 1 1]);
+%         plot([eudMin eudMin],[0 max(tmp_gauss)],'-k>','MarkerFaceColor','k');
+%     case 'EUDmax'
+%         [maxEudMu,maxEudStd] = apm_eudProb(expDose(vois(2).ix),covDose(vois(2).ix,vois(2).ix),vois(2).eudK);
+%         
+%         plot([minDose minDose],[0 1],'--k<','MarkerFaceColor','k');
+%         tmp_d = linspace(0,1.1,100);
+%         tmp_pVal = maxEudMu + maxEudStd*sqrt(2)*erfinv(2*eudMaxProbability - 1);
+%         [~, tmp_ix ] = min( abs( tmp_d-tmp_pVal ) );
+%         
+%         tmp_gauss = 1/sqrt(2*pi*maxEudStd^2) * exp(-0.5*(tmp_d-maxEudMu).^2 ./ maxEudStd^2);
+%         tmp_gauss = 0.5 * tmp_gauss / max(tmp_gauss);
+%         plot(tmp_d,tmp_gauss,'Color',0.5*[1 1 1]);
+%         plot([eudMax eudMax],[0 tmp_gauss(tmp_ix)],'-k<','MarkerFaceColor','k');  
+%         nomEud = apm_eud(dose(vois(2).ix),vois(2).eudK);
+%         plot(nomEud,0,'k*','MarkerFaceColor','k');
+%     case 'meanMax'
+%         [maxEudMu,maxEudStd] = apm_eudProb(expDose(vois(2).ix),covDose(vois(2).ix,vois(2).ix),1);
+%         plot([minDose minDose],[0 1],'--k<','MarkerFaceColor','k');       
+%         tmp_d = linspace(0,1.1,100);
+%         tmp_pVal = maxEudMu + maxEudStd*sqrt(2)*erfinv(2*eudMaxProbability - 1);
+%         [~, tmp_ix ] = min( abs( tmp_d-tmp_pVal ) );
+%         tmp_gauss = 1/sqrt(2*pi*maxEudStd^2) * exp(-0.5*(tmp_d-maxEudMu).^2 ./ maxEudStd^2);
+%         tmp_gauss = 0.5 * tmp_gauss / max(tmp_gauss);
+%         plot(tmp_d,tmp_gauss,'Color',0.5*[1 1 1]);
+%         plot([eudMax eudMax],[0 tmp_gauss(tmp_ix)],'-k<','MarkerFaceColor','k');
+%         nomEud = apm_eud(dose(vois(2).ix),1);
+%         plot(nomEud,0,'k*','MarkerFaceColor','k');
+%     otherwise        
+% end
+%  
+% if contains(obj,'pwSqDev')
+%     plot([vois(2).probObjFunc{1}.dMax vois(2).probObjFunc{1}.dMax],[0 1],'--k<','MarkerFaceColor','k');
+% end
+
+
 
 
 
@@ -416,16 +417,17 @@ end
 
 hold(hAxProbDvh,'on');
 for v = 1:numel(vois)
-    dvhsProb{v} = apm_DVH(doseProb(vois(v).ix),100,1.1);
-    %[expDvhs{v},stdDvhs{v}] = apm_DVHprob(expDose(vois(v).ix),covDose(vois(v).ix,vois(v).ix),100,1.1,'int_gauss');
-    plot(hAxProbDvh,dvhsProb{v}(1,:),dvhsProb{v}(2,:),'LineWidth',2,'LineStyle','--','Color',vois(v).dvhColor);
+
+    plot(hAxProbDvh,vois(v).nomDVHprob(1,:),vois(v).nomDVHprob(2,:),'LineWidth',0.5,'LineStyle','--','Color',vois(v).dvhColor);
     %dvhsProb{v} = apm_DVH(doseProb(vois(v).ix),100,1.1);
-    [expDvhsProb{v},stdDvhsProb{v}] = apm_DVHprob(expDoseProb(vois(v).ix),covDoseProb(vois(v).ix,vois(v).ix),100,1.1,'int_gauss');
-    plot(hAxProbDvh,expDvhsProb{v}(1,:),expDvhsProb{v}(2,:),'LineWidth',2,'LineStyle','-','Color',vois(v).dvhColor);
+    
+    apm_plotProbDVH(hAxProbDvh,vois(v).expDVHprob,vois(v).stdDVHprob,vois(v).dvhColor,{'-','-.'},dvhPlotMode);
+    
+    %plot(hAxProbDvh,vois(v).expDVHprob(1,:),vois(v).expDVHprob(2,:),'LineWidth',2,'LineStyle','-','Color',vois(v).dvhColor);
     %hAxProbDvh.ColorOrderIndex = hAxProbDvh.ColorOrderIndex - 1;
-    plot(hAxProbDvh,expDvhsProb{v}(1,:),expDvhsProb{v}(2,:)+stdDvhsProb{v}(2,:),'LineWidth',1,'LineStyle','-.','Color',vois(v).dvhColor);
+    %plot(hAxProbDvh,vois(v).expDVHprob(1,:),vois(v).expDVHprob(2,:)+vois(v).stdDVHprob(2,:),'LineWidth',1,'LineStyle','-.','Color',vois(v).dvhColor);
     %hAxProbDvh.ColorOrderIndex = hAxProbDvh.ColorOrderIndex - 1;
-    plot(hAxProbDvh,expDvhsProb{v}(1,:),expDvhsProb{v}(2,:)-stdDvhsProb{v}(2,:),'LineWidth',1,'LineStyle','-.','Color',vois(v).dvhColor);
+    %plot(hAxProbDvh,vois(v).expDVHprob(1,:),vois(v).expDVHprob(2,:)-vois(v).stdDVHprob(2,:),'LineWidth',1,'LineStyle','-.','Color',vois(v).dvhColor);
 end
 
 box(hAxProbDvh,'on');
@@ -435,78 +437,80 @@ xlim(hAxProbDvh,[0 1.1]);
 xlabel(hAxProbDvh,'rel. dose');
 ylabel(hAxProbDvh,'rel. volume');
 
-switch constr
-    case 'DVHmin'
-        plot(dvhDparam,dvhMinVol,'^k','MarkerFaceColor','k');
-    case 'DVHmax'
-        plot(dvhDparam,dvhMaxVol,'vk','MarkerFaceColor','k');
-    case 'minDose'
-        plot([minDose minDose],[0 1],'--k>','MarkerFaceColor','k');
-        [minDoseMu,minDoseStd] = apm_eudProb(expDoseProb(vois(1).ix),covDoseProb(vois(1).ix,vois(1).ix),-100);
-        tmp_d = linspace(1e-6,vois(1).dPres*1.2,100);
-        tmp_gauss = 1/sqrt(2*pi*minDoseStd^2) * exp(-0.5*(tmp_d-minDoseMu).^2 ./ minDoseStd^2);
-        tmp_gauss = 0.5 * tmp_gauss / max(tmp_gauss);
-        plot(tmp_d,tmp_gauss,'Color',0.5*[1 1 1]);
-    case 'maxDose'
-        plot([maxDose maxDose],[0 max(tmp_gauss)],'--k<','MarkerFaceColor','k');
-        [maxDoseMu,maxDoseStd] = apm_eudProb(expDoseProb(vois(2).ix),covDoseProb(vois(2).ix,vois(2).ix),100);
-        tmp_d = linspace(0,1.1,100);
-        tmp_gauss = 1/sqrt(2*pi*maxDoseStd^2) * exp(-0.5*(tmp_d-maxDoseMu).^2 ./ maxDoseStd^2);
-        tmp_gauss = 0.5 * tmp_gauss / max(tmp_gauss);
-        plot(tmp_d,tmp_gauss,'Color',0.5*[1 1 1]);
-        %plot([maxDose maxDose],[0 max(tmp_gauss)],'--k<','MarkerFaceColor','k');
-    case 'EUDmin'
-        [minEudMu,minEudStd] = apm_eudProb(expDoseProb(vois(1).ix),covDoseProb(vois(1).ix,vois(1).ix),eudK);
-        %plot([minDose minDose],[0 1],'--k<','MarkerFaceColor','k');
-        tmp_d = linspace(0,1.1,100);
-        tmp_gauss = 1/sqrt(2*pi*minEudStd^2) * exp(-0.5*(tmp_d-minEudMu).^2 ./ minEudStd^2);
-        tmp_gauss = 0.5 * tmp_gauss / max(tmp_gauss);
-        plot(tmp_d,tmp_gauss,'Color',0.5*[1 1 1]);
-        plot([eudMin eudMin],[0 max(tmp_gauss)],'-k>','MarkerFaceColor','k');
-    case 'EUDmax'
-        [maxEudMu,maxEudStd] = apm_eudProb(expDoseProb(vois(2).ix),covDoseProb(vois(2).ix,vois(2).ix),eudK);
-        %plot([minDose minDose],[0 1],'--k<','MarkerFaceColor','k');
-        tmp_d = linspace(0,1.1,100);
-        tmp_gauss = 1/sqrt(2*pi*maxEudStd^2) * exp(-0.5*(tmp_d-maxEudMu).^2 ./ maxEudStd^2);                      
-        tmp_gauss = 0.5 * tmp_gauss / max(tmp_gauss);
-        
-        plot(tmp_d,tmp_gauss,'Color',0.5*[1 1 1]);
-        
-        tmp_pVal = maxEudMu + maxEudStd*sqrt(2)*erfinv(2*eudMaxProbability - 1);
-        [~, tmp_ix ] = min( abs( tmp_d-tmp_pVal ) );
-        
-        plot([eudMax eudMax],[0 tmp_gauss(tmp_ix)],'-k<','MarkerFaceColor','k');
-        
-        nomEud = apm_eud(doseProb(vois(2).ix),vois(2).eudK);
-        plot(nomEud,0,'k*','MarkerFaceColor','k');
-        
-    case 'meanMax'
-        [maxEudMu,maxEudStd] = apm_eudProb(expDoseProb(vois(2).ix),covDoseProb(vois(2).ix,vois(2).ix),1);
-        %plot([minDose minDose],[0 1],'--k<','MarkerFaceColor','k');
-        tmp_d = linspace(0,1.1,100);
-        tmp_gauss = 1/sqrt(2*pi*maxEudStd^2) * exp(-0.5*(tmp_d-maxEudMu).^2 ./ maxEudStd^2);                      
-        tmp_gauss = 0.5 * tmp_gauss / max(tmp_gauss);
-        
-        plot(tmp_d,tmp_gauss,'Color',0.5*[1 1 1]);
-        
-        tmp_pVal = maxEudMu + maxEudStd*sqrt(2)*erfinv(2*eudMaxProbability - 1);
-        [~, tmp_ix ] = min( abs( tmp_d-tmp_pVal ) );
-        
-        plot([eudMax eudMax],[0 tmp_gauss(tmp_ix)],'-k<','MarkerFaceColor','k');
-        
-        nomEud = apm_eud(doseProb(vois(2).ix),1);
-        plot(nomEud,0,'k*','MarkerFaceColor','k');
-    otherwise        
-end
+apm_plotObjConstrInDVH(hAxProbDvh,vois,true);
 
-if contains(obj,'pwSqDev')
-    plot([vois(2).probObjFunc{1}.dMax vois(2).probObjFunc{1}.dMax],[0 1],'--k<','MarkerFaceColor','k');
-end
+% switch constr
+%     case 'DVHmin'
+%         plot(dvhDparam,dvhMinVol,'^k','MarkerFaceColor','k');
+%     case 'DVHmax'
+%         plot(dvhDparam,dvhMaxVol,'vk','MarkerFaceColor','k');
+%     case 'minDose'
+%         plot([minDose minDose],[0 1],'--k>','MarkerFaceColor','k');
+%         [minDoseMu,minDoseStd] = apm_eudProb(expDoseProb(vois(1).ix),covDoseProb(vois(1).ix,vois(1).ix),-100);
+%         tmp_d = linspace(1e-6,vois(1).dPres*1.2,100);
+%         tmp_gauss = 1/sqrt(2*pi*minDoseStd^2) * exp(-0.5*(tmp_d-minDoseMu).^2 ./ minDoseStd^2);
+%         tmp_gauss = 0.5 * tmp_gauss / max(tmp_gauss);
+%         plot(tmp_d,tmp_gauss,'Color',0.5*[1 1 1]);
+%     case 'maxDose'
+%         plot([maxDose maxDose],[0 max(tmp_gauss)],'--k<','MarkerFaceColor','k');
+%         [maxDoseMu,maxDoseStd] = apm_eudProb(expDoseProb(vois(2).ix),covDoseProb(vois(2).ix,vois(2).ix),100);
+%         tmp_d = linspace(0,1.1,100);
+%         tmp_gauss = 1/sqrt(2*pi*maxDoseStd^2) * exp(-0.5*(tmp_d-maxDoseMu).^2 ./ maxDoseStd^2);
+%         tmp_gauss = 0.5 * tmp_gauss / max(tmp_gauss);
+%         plot(tmp_d,tmp_gauss,'Color',0.5*[1 1 1]);
+%         %plot([maxDose maxDose],[0 max(tmp_gauss)],'--k<','MarkerFaceColor','k');
+%     case 'EUDmin'
+%         [minEudMu,minEudStd] = apm_eudProb(expDoseProb(vois(1).ix),covDoseProb(vois(1).ix,vois(1).ix),eudK);
+%         %plot([minDose minDose],[0 1],'--k<','MarkerFaceColor','k');
+%         tmp_d = linspace(0,1.1,100);
+%         tmp_gauss = 1/sqrt(2*pi*minEudStd^2) * exp(-0.5*(tmp_d-minEudMu).^2 ./ minEudStd^2);
+%         tmp_gauss = 0.5 * tmp_gauss / max(tmp_gauss);
+%         plot(tmp_d,tmp_gauss,'Color',0.5*[1 1 1]);
+%         plot([eudMin eudMin],[0 max(tmp_gauss)],'-k>','MarkerFaceColor','k');
+%     case 'EUDmax'
+%         [maxEudMu,maxEudStd] = apm_eudProb(expDoseProb(vois(2).ix),covDoseProb(vois(2).ix,vois(2).ix),eudK);
+%         %plot([minDose minDose],[0 1],'--k<','MarkerFaceColor','k');
+%         tmp_d = linspace(0,1.1,100);
+%         tmp_gauss = 1/sqrt(2*pi*maxEudStd^2) * exp(-0.5*(tmp_d-maxEudMu).^2 ./ maxEudStd^2);                      
+%         tmp_gauss = 0.5 * tmp_gauss / max(tmp_gauss);
+%         
+%         plot(tmp_d,tmp_gauss,'Color',0.5*[1 1 1]);
+%         
+%         tmp_pVal = maxEudMu + maxEudStd*sqrt(2)*erfinv(2*eudMaxProbability - 1);
+%         [~, tmp_ix ] = min( abs( tmp_d-tmp_pVal ) );
+%         
+%         plot([eudMax eudMax],[0 tmp_gauss(tmp_ix)],'-k<','MarkerFaceColor','k');
+%         
+%         nomEud = apm_eud(doseProb(vois(2).ix),vois(2).eudK);
+%         plot(nomEud,0,'k*','MarkerFaceColor','k');
+%         
+%     case 'meanMax'
+%         [maxEudMu,maxEudStd] = apm_eudProb(expDoseProb(vois(2).ix),covDoseProb(vois(2).ix,vois(2).ix),1);
+%         %plot([minDose minDose],[0 1],'--k<','MarkerFaceColor','k');
+%         tmp_d = linspace(0,1.1,100);
+%         tmp_gauss = 1/sqrt(2*pi*maxEudStd^2) * exp(-0.5*(tmp_d-maxEudMu).^2 ./ maxEudStd^2);                      
+%         tmp_gauss = 0.5 * tmp_gauss / max(tmp_gauss);
+%         
+%         plot(tmp_d,tmp_gauss,'Color',0.5*[1 1 1]);
+%         
+%         tmp_pVal = maxEudMu + maxEudStd*sqrt(2)*erfinv(2*eudMaxProbability - 1);
+%         [~, tmp_ix ] = min( abs( tmp_d-tmp_pVal ) );
+%         
+%         plot([eudMax eudMax],[0 tmp_gauss(tmp_ix)],'-k<','MarkerFaceColor','k');
+%         
+%         nomEud = apm_eud(doseProb(vois(2).ix),1);
+%         plot(nomEud,0,'k*','MarkerFaceColor','k');
+%     otherwise        
+% end
+% 
+% if contains(obj,'pwSqDev')
+%     plot([vois(2).probObjFunc{1}.dMax vois(2).probObjFunc{1}.dMax],[0 1],'--k<','MarkerFaceColor','k');
+% end
 
 %% export
-cleanfigure('handle',axProfile.Parent);
-cleanfigure('handle',hAxProbDvh.Parent);
-cleanfigure('handle',axDVH.Parent);
-matlab2tikz([tikzFolder 'profile_' obj '_' constr '_' num2str(nFrac) 'frac' modeStr '.tikz'],'relativeDataPath','tikz/','figurehandle',axProfile.Parent,'parseStrings',false,'height','\figureheight','width','\figurewidth','showInfo',false,'extraAxisOptions',{'ylabel near ticks','xlabel near ticks'});
-matlab2tikz([tikzFolder 'dvhProb_' obj '_' constr '_' num2str(nFrac) 'frac' modeStr '.tikz'],'relativeDataPath','tikz/','figurehandle',hAxProbDvh.Parent,'parseStrings',false,'height','\figureheight','width','\figurewidth','showInfo',false,'extraAxisOptions',{'ylabel near ticks','xlabel near ticks'});
-matlab2tikz([tikzFolder 'dvhConv_' obj '_' constr '_' num2str(nFrac) 'frac' modeStr '.tikz'],'relativeDataPath','tikz/','figurehandle',axDVH.Parent,'parseStrings',false,'height','\figureheight','width','\figurewidth','showInfo',false,'extraAxisOptions',{'ylabel near ticks','xlabel near ticks'});
+%cleanfigure('handle',axProfile.Parent);
+%cleanfigure('handle',hAxProbDvh.Parent);
+%cleanfigure('handle',axDVH.Parent);
+%matlab2tikz([tikzFolder 'profile_' obj '_' constr '_' num2str(nFrac) 'frac' modeStr '.tikz'],'relativeDataPath','tikz/','figurehandle',axProfile.Parent,'parseStrings',false,'height','\figureheight','width','\figurewidth','showInfo',false,'extraAxisOptions',{'ylabel near ticks','xlabel near ticks'});
+%matlab2tikz([tikzFolder 'dvhProb_' obj '_' constr '_' num2str(nFrac) 'frac' modeStr '.tikz'],'relativeDataPath','tikz/','figurehandle',hAxProbDvh.Parent,'parseStrings',false,'height','\figureheight','width','\figurewidth','showInfo',false,'extraAxisOptions',{'ylabel near ticks','xlabel near ticks'});
+%matlab2tikz([tikzFolder 'dvhConv_' obj '_' constr '_' num2str(nFrac) 'frac' modeStr '.tikz'],'relativeDataPath','tikz/','figurehandle',axDVH.Parent,'parseStrings',false,'height','\figureheight','width','\figurewidth','showInfo',false,'extraAxisOptions',{'ylabel near ticks','xlabel near ticks'});

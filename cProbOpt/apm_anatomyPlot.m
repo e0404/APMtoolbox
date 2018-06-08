@@ -1,4 +1,7 @@
 function apm_anatomyPlot(h,x,vois)
+if ~isvalid(h)
+    warning('No valid axis provided! Skipping...');
+end
 
 plotColors = apm_plotColors;
 

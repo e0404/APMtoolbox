@@ -1,5 +1,9 @@
 function apm_profilePlot(h,x,dose,expDose,stdDose,lineStyle)
 
+if ~isvalid(h)
+    warning('No valid axis provided! Skipping...');
+end
+
 if nargin < 6
     lineStyle = '-';
 end
