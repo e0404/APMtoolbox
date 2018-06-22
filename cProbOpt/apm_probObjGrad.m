@@ -12,7 +12,16 @@ for v=1:numel(vois)
         obj = vois(v).probObjFunc{j};
         
         gMu = edij(vois(v).ix,:)' * obj.gradientMeanDose(mu_d_voi,cov_d_voi);
-        gCov = double(ttt(tensor(apm_calcCovGrad(cijlm(vois(v).ix,:,vois(v).ix,:),w)),tensor(obj.gradientCovDose(mu_d_voi,cov_d_voi)),[1 3],[1 2])); 
+        covGrad = apm_calcCovGrad(cijlm(vois(v).ix,:,vois(v).ix,:),w);
+        objGradCov = obj.gradientCovDose(mu_d_voi,cov_d_voi);
+        
+        %Product with reshape
+        covGradMatrificated = reshape(permute(covGrad,[2 1 3]),[size(covGrad,2) size(covGrad,1)^2]);
+        objGradCovVectorized = reshape(objGradCov,[numel(objGradCov) 1]);
+        gCov = covGradMatrificated * objGradCovVectorized;
+        
+        %Product with tensor toolbox
+        %gCov = double(ttt(tensor(covGrad),tensor(objGradCov),[1 3],[1 2])); 
         
         g = g + (gMu + gCov);
         %muGrad(vois(v).ix) = muGrad(vois(v).ix) + obj.gradientMeanDose(mu_d_voi,cov_d_voi);
