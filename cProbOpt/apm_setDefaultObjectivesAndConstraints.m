@@ -94,8 +94,8 @@ end
 
 switch constr
     case 'DVHmin'
-        dvhMinVol = 0.95;
-        dvhDparam = 0.95;  
+        dvhMinVol = 0.98;
+        dvhDparam = 0.98;  
         optFunc = DoseConstraints.matRad_MinMaxDVH;
         optFunc.parameters{1} = dvhDparam;
         optFunc.parameters{2} = dvhMinVol;
@@ -146,7 +146,8 @@ switch constr
         optFunc.referenceScalingVal = 1e-9;
         vois(2).cFunc{end+1} = optFunc;   
         
-        dvhMaxProbability = 1-0.15865; %1 standard deviation
+        %dvhMaxProbability = 1-0.15865; %1 standard deviation
+        dvhMaxProbability = 0.997; %1 standard deviation
         cObj = apm_probDvhMaxQuantileConstraint(dvhDparam,dvhMaxVol,dvhMaxProbability,'normal');
         vois(2).probCFunc{end+1} = cObj;
         

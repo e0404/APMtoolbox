@@ -17,7 +17,9 @@ fullCovariance = true;
 sampleValidation = false;
 
 separateDVHplots = false;
+plotBodyDVH = false;
 dvhPlotMode = 'tripleband';
+%dvhPlotMode = 'beta';
 
 %Anatomy
 nVox = 100;
@@ -28,7 +30,9 @@ relativeOARSize = 0.2;
 %Irradiation geometry
 spotDistance = 3; %Spot Spacing
 spotWidth = 5; 
-nFrac = 5; % Number of Fractions
+nFrac = 1; % Number of Fractions
+
+nDvhBins = 500;
 
 
 
@@ -142,13 +146,14 @@ end
 obj = 'pwSqDev';
 %obj = 'sqDev';
 constr = 'DVHmin';
+%constr = 'DVHmax';
 %constr = '';
 
 
 %Set a default constraint set via helper function
 vois = apm_setDefaultObjectivesAndConstraints(vois,obj,constr);
 
-
+numNomConstraints = sum(cellfun(@numel,{vois(:).cFunc}));
 
 %options = optimoptions('fmincon','SpecifyObjectiveGradient',true,'Algorithm','interior-point','AlwaysHonorConstraints',true);
 options = optimoptions('fmincon',...
@@ -176,12 +181,17 @@ stdDose = sqrt(varDose);
 %calculate DVHs
 for v = 1:numel(vois)
     disp(['Computing nominal and probabilistic DVHs for VOI ' vois(v).name '...']); 
-    vois(v).nomDVH = apm_DVH(dose(vois(v).ix),100,1.1);
-    [vois(v).expDVH,vois(v).stdDVH] = apm_DVHprob(expDose(vois(v).ix),covDose(vois(v).ix,vois(v).ix),100,1.1,'int_gauss');
+    vois(v).nomDVH = apm_DVH(dose(vois(v).ix),nDvhBins,1.1);
+    [vois(v).expDVH,vois(v).stdDVH] = apm_DVHprob(expDose(vois(v).ix),covDose(vois(v).ix,vois(v).ix),nDvhBins,1.1,'int_gauss_cuda');
 end
 
 %% Plot result
-
+if ~isvalid(axProfile)
+    figure;
+    axProfile = axes();%axes('Position',get(axHist,'Position'),'ActivePositionProperty','Position');
+    apm_anatomyPlot(axProfile,x,vois);
+end
+    
 apm_profilePlot(axProfile,x,dose,expDose,stdDose,'--');
 
 %DVH
@@ -192,10 +202,13 @@ grid(axDVH,'on');
 
 for v = 1:numel(vois)
     %dvhs{v} = apm_DVH(dose(vois(v).ix),100,1.1);
-    plot(axDVH,vois(v).nomDVH(1,:),vois(v).nomDVH(2,:),'LineWidth',0.5,'LineStyle','--','Color',vois(v).dvhColor);
+    %
     %dvhsProb{v} = apm_DVH(doseProb(vois(v).ix),100,1.1);
-    %[expDvhs{v},stdDvhs{v}] = apm_DVHprob(expDose(vois(v).ix),covDose(vois(v).ix,vois(v).ix),100,1.1,'int_gauss');
-    apm_plotProbDVH(axDVH,vois(v).expDVH,vois(v).stdDVH,vois(v).dvhColor,{'-','-.'},dvhPlotMode);
+    %[expDvhs{v},stdDvhs{v}] = apm_DVHprob(expDose(vois(v).ix),covDose(vois(v).ix,vois(v).ix),100,1.1,'int_gauss_cuda');
+    if ~strcmp(vois(v).type,'BODY') || plotBodyDVH
+        plot(axDVH,vois(v).nomDVH(1,:),vois(v).nomDVH(2,:),'LineWidth',0.5,'LineStyle','--','Color',vois(v).dvhColor);
+        apm_plotProbDVH(axDVH,vois(v).expDVH,vois(v).stdDVH,vois(v).dvhColor,{'-','-.'},dvhPlotMode);
+    end        
 end
 
 box(axDVH,'on');
@@ -204,7 +217,7 @@ xlim(axDVH,[0 1.1]);
 xlabel(axDVH,'rel. dose');
 ylabel(axDVH,'rel. volume');
 
-apm_plotObjConstrInDVH(axDVH,vois,false);
+apm_plotObjConstrInDVH(axDVH,vois,false,plotBodyDVH);
 
 % switch constr
 %     case 'DVHmin'
@@ -370,7 +383,12 @@ if sampleValidation
 end
 
 %% Optimize Probabilistic
+
+numProbConstraints = sum(cellfun(@numel,{vois(:).probCFunc}));
+
+% fmincon
 options = optimoptions('fmincon',...
+    'algorithm','interior-point',... interior-point, sqp
     'Display','iter-detailed',...
     'SpecifyObjectiveGradient',true,...
     'SpecifyConstraintGradient',true,...
@@ -384,7 +402,31 @@ options = optimoptions('fmincon',...
 probObjFunc = @(x) apm_fminconObjFuncWrapper(x,@(x) apm_probObjFunc(expDose_ij,covInfluence,x,vois),@(x) apm_probObjGrad(expDose_ij,covInfluence,x,vois));
 probNonlcon = @(x) apm_fminconConstrFuncWrapper(x,@(x) apm_probCFunc(expDose_ij,covInfluence,x,vois),[],@(x) apm_probCJacob(expDose_ij,covInfluence,x,vois),[]);
 [wProb,fVal] = fmincon(probObjFunc,wStart,[],[],[],[],zeros(nSpots,1),Inf*ones(nSpots,1),probNonlcon,options);
-%[wProb,fVal] = fmincon(probFunGrad,wStart,[],[],[],[],zeros(n,1),Inf*ones(n,1),[],options);
+
+%minimize
+%[wProb,fVal] = minimize(probObjFunc,wStart,[],[],[],[],zeros(nSpots,1),Inf*ones(nSpots,1),probNonlcon);
+
+%ipopt
+% funcs.objective = @(x) apm_probObjFunc(expDose_ij,covInfluence,x,vois);
+% funcs.gradient = @(x) apm_probObjGrad(expDose_ij,covInfluence,x,vois);
+% funcs.constraints = @(x) apm_probCFunc(expDose_ij,covInfluence,x,vois);
+% funcs.jacobian = @(x) sparse(transpose(apm_probCJacob(expDose_ij,covInfluence,x,vois)));
+% funcs.iterfunc = @(n,f,auxdata) drawnow('update');
+% 
+% startJacob = funcs.jacobian(wStart);
+% funcs.jacobianstructure = @() sparse(ones(size(startJacob)));
+% 
+% ipoptOptions.lb = zeros(nSpots,1);
+% ipoptOptions.ub = Inf*ones(nSpots,1);
+% ipoptOptions.cu = zeros(numProbConstraints,1);
+% ipoptOptions.cl = -Inf*ones(numProbConstraints,1);
+% 
+% ipoptOptions.ipopt.hessian_approximation = 'limited-memory';
+% %options.ipopt.print_level           = 0;
+% %options.ipopt.hessian_approximation = 'limited-memory';
+% ipoptOptions.ipopt.derivative_test       = 'first-order';
+% [wProb,info] = ipopt(wStart,funcs,ipoptOptions);
+
 
 %disp(['Final Constraint Function value: ' num2str(probConstrFunc(wProb))]);
 
@@ -401,11 +443,16 @@ stdDoseProb = sqrt(varDoseProb);
 %calculate DVHs
 for v = 1:numel(vois)
     disp(['Computing nominal and probabilistic DVHs for VOI ' vois(v).name '...']); 
-    vois(v).nomDVHprob = apm_DVH(doseProb(vois(v).ix),100,1.1);
-    [vois(v).expDVHprob,vois(v).stdDVHprob] = apm_DVHprob(expDoseProb(vois(v).ix),covDoseProb(vois(v).ix,vois(v).ix),100,1.1,'int_gauss');
+    vois(v).nomDVHprob = apm_DVH(doseProb(vois(v).ix),nDvhBins,1.1);
+    [vois(v).expDVHprob,vois(v).stdDVHprob] = apm_DVHprob(expDoseProb(vois(v).ix),covDoseProb(vois(v).ix,vois(v).ix),nDvhBins,1.1,'int_gauss_cuda');
 end
 
 %% Plot results
+if ~isvalid(axProfile)
+    figure;
+    axProfile = axes();%axes('Position',get(axHist,'Position'),'ActivePositionProperty','Position');
+    apm_anatomyPlot(axProfile,x,vois);
+end
 apm_profilePlot(axProfile,x,doseProb,expDoseProb,stdDoseProb,'-');
 
 if ~exist('hAxProbDvh','var') || ~isvalid(hAxProbDvh)
@@ -417,11 +464,12 @@ end
 
 hold(hAxProbDvh,'on');
 for v = 1:numel(vois)
-
-    plot(hAxProbDvh,vois(v).nomDVHprob(1,:),vois(v).nomDVHprob(2,:),'LineWidth',0.5,'LineStyle','--','Color',vois(v).dvhColor);
-    %dvhsProb{v} = apm_DVH(doseProb(vois(v).ix),100,1.1);
+    if ~strcmp(vois(v).type,'BODY') || plotBodyDVH
+        plot(hAxProbDvh,vois(v).nomDVHprob(1,:),vois(v).nomDVHprob(2,:),'LineWidth',0.5,'LineStyle','--','Color',vois(v).dvhColor);
+        %dvhsProb{v} = apm_DVH(doseProb(vois(v).ix),100,1.1);
     
-    apm_plotProbDVH(hAxProbDvh,vois(v).expDVHprob,vois(v).stdDVHprob,vois(v).dvhColor,{'-','-.'},dvhPlotMode);
+        apm_plotProbDVH(hAxProbDvh,vois(v).expDVHprob,vois(v).stdDVHprob,vois(v).dvhColor,{'-','-.'},dvhPlotMode);
+    end
     
     %plot(hAxProbDvh,vois(v).expDVHprob(1,:),vois(v).expDVHprob(2,:),'LineWidth',2,'LineStyle','-','Color',vois(v).dvhColor);
     %hAxProbDvh.ColorOrderIndex = hAxProbDvh.ColorOrderIndex - 1;
@@ -437,7 +485,7 @@ xlim(hAxProbDvh,[0 1.1]);
 xlabel(hAxProbDvh,'rel. dose');
 ylabel(hAxProbDvh,'rel. volume');
 
-apm_plotObjConstrInDVH(hAxProbDvh,vois,true);
+apm_plotObjConstrInDVH(hAxProbDvh,vois,true,plotBodyDVH);
 
 % switch constr
 %     case 'DVHmin'

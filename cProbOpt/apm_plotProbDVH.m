@@ -45,6 +45,7 @@ switch mode
         hIm = imagesc('XData',d,'YData',dvSpace,'CData',cData,'AlphaData',alphaMask,'Parent',h);
         %uistack(hIm,'bottom');
         
+  
     case 'beta'
         dvSpace = linspace(0,1,100);
         %dvSpace = dvSpace(2:end-1);
