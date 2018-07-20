@@ -20,7 +20,7 @@ switch Param.radMod
     
     case {'protons'}
         
-        mu_ini    = peakPos * linspace(0.05,1,Param.NumComp)';
+        mu_ini    = peakPos * linspace(0.05,0.9,Param.NumComp)';
         sigma_ini = 1*(peakPos/Param.NumComp)* ones(Param.NumComp,1);
         
         val = qY(1)/SG(0,1,0,sigma_ini(1));

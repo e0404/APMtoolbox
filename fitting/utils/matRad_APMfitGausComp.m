@@ -107,7 +107,7 @@ for ixOpt = 1:NumOpti
         subplot(NumOpti,2,(ixOpt*2)),plot(qX_long,mGaussComp,'color',colors.dre),hold on;
         subplot(NumOpti,2,(ixOpt*2)),plot(qX_long,qY_long,'color',colors.red,'LineWidth',2);
         subplot(NumOpti,2,(ixOpt*2)),plot(qX_long,qYfitted,'--','color',colors.dkfzdB,'LineWidth',2), grid on, grid minor,
-        title(['before ' Param.Optimizer{1,ixOpt} '; energy: ' num2str(Param.energy) ' MeV; max rel diff: ' num2str(Error.rel.maxDiff) ' %']);
+        title(['after ' Param.Optimizer{1,ixOpt} '; energy: ' num2str(Param.energy) ' MeV; max rel diff: ' num2str(Error.rel.maxDiff) ' %']);
         xlabel('depth'),set(gca,'Xlim',[min(qX) max(qX)]);
     end
     
