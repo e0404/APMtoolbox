@@ -8,7 +8,7 @@
 %
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%
-clc,clear
+clc,clear,%close all
 addpath('utils');
 fEffectToRBExD  = @(effect,alphaX,betaX)(- alphaX + sqrt(alphaX.^2 + 4 .* betaX.* effect))./(2*betaX);
 SG       = @(qX,qW,qMu,qSigma)((qW/(sqrt(2*pi*(qSigma^2)))).*exp(-((qX-qMu).^2)./(2*(qSigma^2))));
@@ -23,6 +23,7 @@ numOfBeams                 = 2;    % 1 = one beam; 2 = two opposing beams
 ixTissue                   = 1;    % use alpha_x/beta_x ratio of 2
 alpha_x                    = machine.data(1).alphaX(ixTissue);
 beta_x                     = machine.data(1).betaX(ixTissue);
+numComp                    = numel(machine.data(1).alphaDose(1).width);  
 Voxel.voxelSize            = 1;    %[mm]
 targetEntry                = 100;  %[mm]
 targetLength               = 50;   %[mm]
@@ -46,7 +47,7 @@ availableranges            = [machine.data.range];
 Spot.Spacing               = 1:1:numel(availablePeakPos);
 availablePeakPos           = availablePeakPos(Spot.Spacing);
 availableranges            = availableranges(Spot.Spacing);
-margin                     = 7;
+margin                     = 20;
 
 Spot.position = [];
 Spot.range    = [];
@@ -80,12 +81,17 @@ Spot.numOfSpots            = length(Spot.position);
 sampleRuns                 = 5000;
 sysRangeError              = 0.035;    % 3.5% relative systematic range error
 rndRangeError              = 1;        % 1mm absolute random range error
+sysBioError                = 0.15;     % 15% error in ion response LQM parameter
+
 % define covariance matrix skelet 
 if numOfBeams == 1
    mCovDepthSkelet = blkdiag(ones(Spot.numOfSpotsPerBeam(1)));
 else
    mCovDepthSkelet = blkdiag(ones(Spot.numOfSpotsPerBeam(1)),ones(Spot.numOfSpotsPerBeam(2)));
 end
+
+% obtain mean and covariance of biological uncertainties
+[vMeanAlphaDose,mCovAlphaDose,vMeanSqrtBetaDose,mCovSqrtBetaDose,mCovBioTot] = getBioCovariance(machine,Spot,sysBioError,ixTissue,numComp);
 
 %% calculate nominal and expected dose influence data
 dij.physicalDose     = spalloc(Voxel.numOfVoxel,Spot.numOfSpots,1);
@@ -117,7 +123,8 @@ end
     
 w0       = 0.2*ones(Spot.numOfSpots,1);
 options  = optimoptions('fmincon','Display','iter-detailed','GradObj','on');
-options.MaxIterations = 3000;
+options.OptimalityTolerance = 1e-8;
+options.MaxIterations       = 3000;
 func     = @(x) obFunc(dij,Voxel,x);
 [w,~]    = fmincon(func,w0,[],[],[],[],zeros(Spot.numOfSpots,1),Inf*ones(Spot.numOfSpots,1),[],options);
 
@@ -125,21 +132,26 @@ effect    = (dij.mAlphaDose    * w)  + (dij.mSqrtBetaDose * w).^2;        % nomi
 effectExp = (dij.mAlphaDoseExp * w)  + (dij.mSqrtBetaDose * w).^2;        % expected dose
 
 %% calculate standard deviation using APM
-std_d       = zeros(Voxel.numOfVoxel,1);
-mCovariance = zeros(Voxel.numOfVoxel,Voxel.numOfVoxel,Spot.numOfSpots,Spot.numOfSpots);
-numComp     = length(machine.data(1).Z.weight);
+std_d            = zeros(Voxel.numOfVoxel,1);
+mCovariance      = zeros(Voxel.numOfVoxel,Voxel.numOfVoxel,Spot.numOfSpots,Spot.numOfSpots);
+mCovariance_phys = zeros(Voxel.numOfVoxel,Voxel.numOfVoxel,Spot.numOfSpots,Spot.numOfSpots);
+numComp          = length(machine.data(1).Z.weight);
  
-mSysCovRadDept  = sysRangeError^2  * (vSpotRange * vSpotRange') .* mCovDepthSkelet;
-mRndCovRadDepth = rndRangeError^2 .*  mCovDepthSkelet;
+mSysCovRadDept   = sysRangeError^2  * (vSpotRange * vSpotRange') .* mCovDepthSkelet;
+mRndCovRadDepth  = rndRangeError^2 .*  mCovDepthSkelet;
+mSysCovBio       = ones(Spot.numOfSpots);
 
 mOmega = zeros(Spot.numOfSpots);
 
 f = waitbar(0,'Please wait...');
 for i = 1:1:Voxel.numOfVoxel
    
-   for l = i; %i:1:Voxel.numOfVoxel
+   for l = i %i:1:Voxel.numOfVoxel
       
-      PSI_ijlm = dij.mAlphaDoseExp(i,:)' * dij.mAlphaDoseExp(l,:);
+      PSI_ijlm      = dij.mAlphaDoseExp(i,:)' * dij.mAlphaDoseExp(l,:);
+      PSI_ijlm_phys = dij.mAlphaDoseExp(i,:)' * dij.mAlphaDoseExp(l,:);
+      
+      mW_Cov_jo   = zeros(numComp); 
       
       for j = 1:Spot.numOfSpots
          
@@ -149,7 +161,7 @@ for i = 1:1:Voxel.numOfVoxel
          Dev_J      = radDepth(i,Spot.ixBeam(j)) - baseEntryJ.alphaDose(ixTissue).mean;
          
          for m = j:Spot.numOfSpots
-            if mSysCovRadDept(j,m) > 0 || mRndCovRadDepth(j,m) > 0 
+            if mSysCovRadDept(j,m) > 0 || mRndCovRadDepth(j,m) > 0 || mSysCovBio(j,m) > 0  % check for correlation
                
                baseEntryM = machine.data(Spot.ixEnergy(m));
                SigmaSq_M  = baseEntryM.alphaDose(ixTissue).width.^2;
@@ -161,17 +173,27 @@ for i = 1:1:Voxel.numOfVoxel
                vLaSi12 = mSysCovRadDept(j,m);
                vLaSi21 = mSysCovRadDept(m,j);
                
-               PSI_ijlm(j,m) = calcSecRangeMom(vLaSi11,vLaSi22,vLaSi12,vLaSi21,Dev_J,Dev_M,Weight_J,Weight_M);
+               mW_CovAlphaDose_jm = zeros(numComp);
+               PSI_ijlm_phys(j,m) = calcSecRangeMom(vLaSi11,vLaSi22,vLaSi12,vLaSi21,Dev_J,Dev_M,Weight_J,Weight_M,mW_CovAlphaDose_jm);
+               PSI_ijlm_phys(m,j) = PSI_ijlm_phys(j,m);  
+               
+               if mSysCovBio(j,m) > 0
+                  mW_CovAlphaDose_jm = mCovAlphaDose(j*numComp-numComp+1:j*numComp,m*numComp-numComp+1:m*numComp);
+               end
+               
+               PSI_ijlm(j,m) = calcSecRangeMom(vLaSi11,vLaSi22,vLaSi12,vLaSi21,Dev_J,Dev_M,Weight_J,Weight_M,mW_CovAlphaDose_jm);
                PSI_ijlm(m,j) = PSI_ijlm(j,m);  
                
             end
          end
       end
-      mCovariance(i,l,:,:) = PSI_ijlm;
-      mCovariance(l,i,:,:) = PSI_ijlm;
+      mCovariance(i,l,:,:)      = PSI_ijlm;
+      mCovariance(l,i,:,:)      = PSI_ijlm;
+      mCovariance_phys(i,l,:,:) = PSI_ijlm_phys;
+      mCovariance_phys(l,i,:,:) = PSI_ijlm_phys;
    end
    
-   mOmega = mOmega + Voxel.penalty(i) * (squeeze(mCovariance(i,i,:,:)) - dij.mAlphaDoseExp(i,:)' * dij.mAlphaDoseExp(i,:));
+   mOmega = mOmega + Voxel.penalty(i) * (squeeze(mCovariance_phys(i,i,:,:)) - dij.mAlphaDoseExp(i,:)' * dij.mAlphaDoseExp(i,:));
    
    std_d(i) = sqrt((w'* squeeze(mCovariance(i,i,:,:)) * w) - (dij.mAlphaDoseExp(i,:) * w)^2);
    waitbar(i/Voxel.numOfVoxel,f,'Calculating (co)-variance...');
@@ -182,7 +204,6 @@ close(f)
 % perform probabilistic optimization
 Voxel.presDose(Voxel.ixNT) = 0;
 w0         = 0.01 * ones(Spot.numOfSpots,1);
-options    = optimoptions('fmincon','Display','iter-detailed','GradObj','on');
 funcProb   = @(x) obFuncProb(dij,Voxel,mOmega,x);
 [wRob,~]   = fmincon(funcProb,w0,[],[],[],[],zeros(Spot.numOfSpots,1),Inf*ones(Spot.numOfSpots,1),[],options);
 
@@ -201,7 +222,6 @@ for i = 1:1:Voxel.numOfVoxel
 end
 close(f)
 
-
 %% sampling non robust and robust scenarios 
 [U,V,S]       = eig(mSysCovRadDept);
 vSampRangeSys = bsxfun(@plus,0,(U *real(sqrtm(V))*S')' * randn(numel(vSpotRange),sampleRuns,1))';
@@ -209,9 +229,13 @@ vSampRangeSys = bsxfun(@plus,0,(U *real(sqrtm(V))*S')' * randn(numel(vSpotRange)
 [U,V,S]       = eig(mRndCovRadDepth);
 vSampRangeRnd = bsxfun(@plus,0,(U *real(sqrtm(V))*S')' * randn(numel(vSpotRange),sampleRuns,1))';
 
+[U,V,S]    = eig(mCovBioTot); 
+mSampBioWeigh = bsxfun(@plus,[vMeanAlphaDose; vMeanSqrtBetaDose],(U * real(sqrtm(V)) * S')' *  randn(Spot.numOfSpots*numComp*2,sampleRuns))';
+  
 h = waitbar(0,'Please wait...');
 mSampDose    = zeros(Voxel.numOfVoxel,sampleRuns);
 mSampDoseRob = zeros(Voxel.numOfVoxel,sampleRuns);
+Offset       = Spot.numOfSpots*numComp;
 
 for ixSample = 1:sampleRuns
    
@@ -221,12 +245,11 @@ for ixSample = 1:sampleRuns
     for j = 1:Spot.numOfSpots
         baseEntry = machine.data(Spot.ixEnergy(j));                                     
         mSampleAlphaDose(:,j)    =   SumGauss(radDepth(:,Spot.ixBeam(j)),baseEntry.alphaDose(ixTissue).mean + vSampRangeSys(ixSample,j)    + vSampRangeRnd(ixSample,j) ,...
-                                              (baseEntry.alphaDose(ixTissue).width).^2 ,baseEntry.alphaDose(ixTissue).weight); 
+                                              (baseEntry.alphaDose(ixTissue).width).^2 ,mSampBioWeigh(ixSample,j*numComp-numComp+1:j*numComp)'); 
         mSampleSqrtBetaDose(:,j) =   SumGauss(radDepth(:,Spot.ixBeam(j)),baseEntry.SqrtBetaDose(ixTissue).mean + vSampRangeSys(ixSample,j) + vSampRangeRnd(ixSample,j) ,...
-                                              (baseEntry.SqrtBetaDose(ixTissue).width).^2 ,baseEntry.SqrtBetaDose(ixTissue).weight);    
-                                           
+                                              (baseEntry.SqrtBetaDose(ixTissue).width).^2 ,mSampBioWeigh(ixSample,j*numComp-numComp+1+Offset:(j*numComp)+Offset)'); 
     end
-    
+
     effectSamp    = (mSampleAlphaDose  * w   )  + (mSampleSqrtBetaDose * w   ).^2; 
     effectSampRob = (mSampleAlphaDose  * wRob)  + (mSampleSqrtBetaDose * wRob).^2; 
    

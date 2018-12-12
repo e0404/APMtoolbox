@@ -122,7 +122,7 @@ mOmega = zeros(Spot.numOfSpots);
 f = waitbar(0,'Please wait...');
 for i = 1:1:Voxel.numOfVoxel
    
-   for l = i; %i:1:Voxel.numOfVoxel
+   for l = i %i:1:Voxel.numOfVoxel
       
       PSI_ijlm = dij.physicalDoseExp(i,:)' * dij.physicalDoseExp(l,:);
       

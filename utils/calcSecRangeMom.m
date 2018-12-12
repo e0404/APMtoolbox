@@ -1,4 +1,4 @@
-function PSI_ijlm =  calcSecRangeMom(vLaSi11,vLaSi22,vLaSi12,vLaSi21,Dev_j,Dev_m,w_j,w_m) 
+function PSI_ijlm =  calcSecRangeMom(vLaSi11,vLaSi22,vLaSi12,vLaSi21,Dev_j,Dev_m,w_j,w_m,mW_CovBio) 
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Function to calculate the second raw moment. Please note that i
 % and l depict voxel indices and j and m pencil beam indices. This function
@@ -27,7 +27,6 @@ function PSI_ijlm =  calcSecRangeMom(vLaSi11,vLaSi22,vLaSi12,vLaSi21,Dev_j,Dev_m
 % Copyright 2018 Hans-Peter Wieser, Niklas Wahl, Philipp Hennig and Mark Bangert
 %
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-mW_CovBio = 0;
 bioOffset = mW_CovBio + (w_j * w_m');
 Det       = vLaSi11*vLaSi22' - (vLaSi12*vLaSi21');
 FracDet   = 1./(2*pi*sqrt(Det));
