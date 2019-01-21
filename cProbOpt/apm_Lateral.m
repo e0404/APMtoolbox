@@ -17,7 +17,8 @@ fullCovariance = true;
 sampleValidation = false;
 
 separateDVHplots = false;
-dvhPlotMode = 'tripleband';
+%dvhPlotMode = 'tripleband';
+dvhPlotMode = 'q';
 
 %Anatomy
 nVox = 100;
@@ -195,6 +196,15 @@ for v = 1:numel(vois)
     plot(axDVH,vois(v).nomDVH(1,:),vois(v).nomDVH(2,:),'LineWidth',0.5,'LineStyle','--','Color',vois(v).dvhColor);
     %dvhsProb{v} = apm_DVH(doseProb(vois(v).ix),100,1.1);
     %[expDvhs{v},stdDvhs{v}] = apm_DVHprob(expDose(vois(v).ix),covDose(vois(v).ix,vois(v).ix),100,1.1,'int_gauss');
+    
+    if strcmp(dvhPlotMode,'q')
+        try 
+            dvhPlotMode = num2str(vois(v).probCFunc{1}.p);
+        catch
+            dvhPlotMode = '';
+        end
+    end
+    
     apm_plotProbDVH(axDVH,vois(v).expDVH,vois(v).stdDVH,vois(v).dvhColor,{'-','-.'},dvhPlotMode);
 end
 
@@ -420,6 +430,14 @@ for v = 1:numel(vois)
 
     plot(hAxProbDvh,vois(v).nomDVHprob(1,:),vois(v).nomDVHprob(2,:),'LineWidth',0.5,'LineStyle','--','Color',vois(v).dvhColor);
     %dvhsProb{v} = apm_DVH(doseProb(vois(v).ix),100,1.1);
+    
+    if strcmp(dvhPlotMode,'q')
+        try 
+            dvhPlotMode = num2str(vois(v).probCFunc{1}.p);
+        catch
+            dvhPlotMode = '';
+        end
+    end
     
     apm_plotProbDVH(hAxProbDvh,vois(v).expDVHprob,vois(v).stdDVHprob,vois(v).dvhColor,{'-','-.'},dvhPlotMode);
     

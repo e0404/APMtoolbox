@@ -12,9 +12,9 @@ d = expDvh(1,:);
 mu = expDvh(2,:);
 sig = stdDvh(2,:);
 
-plot(d,mu,'Color',color,'LineStyle',styles{1},'LineWidth',2);
-plot(d,mu + sig,'Color',color,'LineStyle',styles{2},'LineWidth',1);
-plot(d,mu - sig,'Color',color,'LineStyle',styles{2},'LineWidth',1);
+plot(h,d,mu,'Color',color,'LineStyle',styles{1},'LineWidth',2);
+%plot(h,d,mu + sig,'Color',color,'LineStyle',styles{2},'LineWidth',1);
+%plot(h,d,mu - sig,'Color',color,'LineStyle',styles{2},'LineWidth',1);
 
 switch mode
     case 'band'
@@ -91,7 +91,16 @@ switch mode
         hIm = imagesc('XData',d,'YData',dvSpace,'CData',cData,'AlphaData',alphaMask,'Parent',h);
         
     otherwise
-                
+        p = str2double(mode);
+        if p < 1 && p > 0
+            q = norminv(p,expDvh,stdDvh);
+            fill(h,[d';flipud(d')],[(mu-sig)';flipud((mu+sig)')],color,'FaceAlpha',0.2,'LineStyle','none');
+            fill(h,[d';flipud(d')],[(mu-2*sig)';flipud((mu+2*sig)')],color,'FaceAlpha',0.15,'LineStyle','none');
+            fill(h,[d';flipud(d')],[(mu-3*sig)';flipud((mu+3*sig)')],color,'FaceAlpha',0.1,'LineStyle','none');
+            plot(h,d,q,'Color',color,'LineStyle',styles{2},'LineWidth',2);
+        else
+            
+        end                
 end
 
 end

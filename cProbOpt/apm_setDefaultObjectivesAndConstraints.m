@@ -107,7 +107,7 @@ switch constr
         %constrJacob = @(x) -transpose(transpose(matRad_jacobFunc(dose_ij(vois(1).ix,:)*x,constraint,dvhDparam)) * dose_ij(vois(1).ix,:));
         %constrJacob = @(x) -transpose(transpose(vois(1).optFunc{1}.computeDoseConstraintJacobian(dose_ij(vois(1).ix,:)*x)) * dose_ij(vois(1).ix,:));
         
-        dvhMinProbability = 0.15865; %1 standard deviation
+        dvhMinProbability = 0.05; %1 standard deviation
         cObj = apm_probDvhMinQuantileConstraint(dvhDparam,dvhMinVol,dvhMinProbability,'normal');
         vois(1).probCFunc{end+1} = cObj;
         
