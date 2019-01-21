@@ -10,6 +10,8 @@ end
 
 %obj = 'sqDev', 'pwSqDev' or 'pwSqDevFake'
 
+dRef = max([vois(:).dPres]);
+
 %set objective function
 switch obj
     case 'sqDev'        
@@ -95,7 +97,7 @@ end
 switch constr
     case 'DVHmin'
         dvhMinVol = 0.98;
-        dvhDparam = 0.98;  
+        dvhDparam = 0.98*dRef;  
         optFunc = DoseConstraints.matRad_MinMaxDVH;
         optFunc.parameters{1} = dvhDparam;
         optFunc.parameters{2} = dvhMinVol;
@@ -112,7 +114,7 @@ switch constr
         vois(1).probCFunc{end+1} = cObj;
         
     case 'EUDmin'
-        eudMin = 0.99;
+        eudMin = 0.99*dRef ;
         %eudK = -20;
         vois(1).eudK;
         
@@ -127,7 +129,7 @@ switch constr
         cObj = apm_probEudMinQuantileConstraint(eudMin,eudK,eudMinProbability,'normal');
         vois(1).probCFunc{end+1} = cObj;                
     case 'minDose'
-        minDose = 0.95;
+        minDose = 0.95*vois(1).dPres;
         optFunc = DoseConstraints.matRad_MinMaxDose;
         optFunc.parameters{1} = minDose;
         optFunc.parameters{2} = Inf;        
@@ -138,7 +140,7 @@ switch constr
         vois(1).probCFunc{end+1} = cObj; 
     case 'DVHmax'
         dvhMaxVol = 0.3;
-        dvhDparam = 0.5;
+        dvhDparam = 0.5*vois(1).dPres;
         optFunc = DoseConstraints.matRad_MinMaxDVH;
         optFunc.parameters{1} = dvhDparam;
         optFunc.parameters{2} = -Inf;
@@ -152,7 +154,7 @@ switch constr
         vois(2).probCFunc{end+1} = cObj;
         
     case 'EUDmax'
-        eudMax = 0.4;
+        eudMax = 0.4*dRef ;
         eudK = vois(2).eudK;
         optFunc = DoseConstraints.matRad_MinMaxEUD;
         optFunc.parameters{1} = eudK;
@@ -166,7 +168,7 @@ switch constr
         cObj = apm_probEudMaxQuantileConstraint(eudMax,eudK,eudMaxProbability,'normal');
         vois(2).probCFunc{end+1} = cObj;
     case 'meanMax'
-        eudMax = 0.4;
+        eudMax = 0.4*dRef ;
         eudK = 1;
         optFunc = DoseConstraints.matRad_MinMaxEUD;
         optFunc.parameters{1} = eudK;
@@ -180,7 +182,7 @@ switch constr
         cObj = apm_probEudMaxQuantileConstraint(eudMax,eudK,eudMaxProbability,'normal');
         vois(2).probCFunc{end+1} = cObj;
     case 'maxDose'
-        maxDose = 0.75;
+        maxDose = 0.75*dRef ;
         optFunc = DoseConstraints.matRad_MinMaxDose;
         optFunc.parameters{1} = -Inf;
         optFunc.parameters{2} = maxDose;        
