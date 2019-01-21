@@ -65,12 +65,12 @@ switch method
         %cuKernelVar.ThreadBlockSize = [12 12 4]; 
         
         cuKernelVarSingle = parallel.gpu.CUDAKernel('C:\dev\APM\CUDA\QI\DVH\x64\Release\dvh.ptx','double* , const double*, const double*, const double*, const double*, int, int','dvhVarSingleBin');
-        cuKernelVarSingle.ThreadBlockSize = [24 24 1]; 
+        cuKernelVarSingle.ThreadBlockSize = [32 32 1]; 
         
         %cuKernelCov = parallel.gpu.CUDAKernel('C:\dev\APM\CUDA\QI\DVH\x64\Release\dvh.ptx','double* , const double*, const double*, const double*, const double*, int, int','dvhCov');
         %cuKernelCov.ThreadBlockSize = [12 12 4]; 
         cuKernelCovSingle = parallel.gpu.CUDAKernel('C:\dev\APM\CUDA\QI\DVH\x64\Release\dvh.ptx','double* , const double*, const double*, const double*, const double*, int, int, int, int','dvhCovTwoBins');
-        cuKernelCovSingle.ThreadBlockSize = [24 24 1]; 
+        cuKernelCovSingle.ThreadBlockSize = [32 32 1]; 
         
         expDvhGPU = gpuArray(zeros(nBins,1,'double'));
         varDvhGPU = gpuArray(zeros(nBins,1,'double'));
