@@ -1,4 +1,4 @@
-function [expDvh,stdDvh,covDvh] = apm_DVHprob(expDose,covDose,nBins,dMax,method)
+function [expDvh,stdDvh,covDvh] = apm_DVHprob(expDose,covDose,nBins,dMax,method,copula_model,copula_marginals,dmin_shiftedbeta,dmax_shiftedbeta)
 
 if nargin < 3 || isempty(nBins)
     nBins = 100;
@@ -10,6 +10,25 @@ end
 
 if nargin < 5
     method = 'int_gauss';
+end
+
+% Define parameters of the Copula
+if nargin < 6
+    copula_model = 'gauss';
+end
+
+if nargin < 7
+    copula_marginals = cell(1,numel(expDose));
+    copula_marginals(:) = {'gauss'};
+end
+
+% Define support of the shifted beta
+if nargin < 8
+    dmin_shiftedbeta= zeros(1,numel(expDose));
+end
+
+if nargin < 9
+    dmax_shiftedbeta = ones(1, numel(expDose));
 end
 
 dAxis = linspace(0,dMax,nBins);
@@ -35,17 +54,28 @@ covDose = covDose + diag(addDiag);
 reducedVoxNum = numel(expDose);
 
 switch method
+    case 'copula'
+        [expDvh(2,:),stdDvh(2,:)] = probDVHCopulaExpStd(expDose,covDose,dAxis,copula_model,copula_marginals,dmin_shiftedbeta,dmax_shiftedbeta);
+        if nargout > 2
+            covDvh = calcCovDvhCopula(expDose,covDose,dAxis,expDvh(2,:),copula_model,copula_marginals,dmin_shiftedbeta,dmax_shiftedbeta);
+        end
     case 'int_gauss'
         [expDvh(2,:),stdDvh(2,:)] = probDVHGaussExpStd(expDose,covDose,dAxis);
         if nargout > 2
             covDvh = calcCovDvhGauss(expDose,covDose,dAxis,expDvh(2,:));
         end
+
+    case 'int_loggauss'
+        [expDvh(2,:),stdDvh(2,:)] = probDVHLnGaussExpStd(expDose,covDose,dAxis);
+        if nargout > 2
+            covDvh = calcCovDvhLnGauss(expDose,covDose,dAxis,expDvh(2,:));
+        end
+    
     case 'int_gauss_cuda'
         disp('Setting up kernel');
         tic
         
-                     
-        
+
         %single precision
         %{
         cuKernel = parallel.gpu.CUDAKernel('C:\dev\APM\CUDA\QI\DVH\x64\Release\dvh.ptx','float* , float*, const float*, const float*, const float*, int, int','dvhRawMoments');
@@ -145,6 +175,85 @@ expDvh(2,:) = expDvh(2,:)*reducedVoxNum/fullVoxNum;
 
 end
 
+function [expDvh,stdDvh] = probDVHCopulaExpStd(expDose,covDose,dAxis,copula_model,copula_marginals,dmin_shiftedbeta,dmax_shiftedbeta)    
+    nBins = numel(dAxis);
+    biCum = zeros(1,nBins);
+    diagCum = zeros(1,nBins);
+
+    for i = 1:numel(expDose)
+        mean_i = expDose(i);
+        sig_i = sqrt(covDose(i,i));        
+        if ~isreal(sig_i) || isnan(sig_i)
+            continue;
+        end
+        P1 = apm_calcCdfDose(dAxis, mean_i*ones(numel(1,nBins)), sig_i*ones(numel(1,nBins)), copula_marginals(i), 1,dmin_shiftedbeta(i),dmax_shiftedbeta(i));
+        
+        
+        if any(isnan(P1))
+            warning('CDF evaluates to NaN');
+            P1(isnan(P1)) = 0;
+        end
+        diagCum = diagCum + P1;
+        
+        for l = i+1:numel(expDose)
+            mean_l = expDose(l);
+            sig_l = sqrt(covDose(l,l));
+            if ~isreal(sig_l) || isnan(sig_l)
+                continue;
+            end
+            r = (covDose(i,l) / (sig_i*sig_l)) * ones(1,nBins);
+            u_i = apm_calcCdfDose(dAxis, mean_i, sig_i, copula_marginals(i),0,dmin_shiftedbeta(i),dmax_shiftedbeta(i));
+            u_l = apm_calcCdfDose(dAxis, mean_l, sig_l, copula_marginals(l),0,dmin_shiftedbeta(l),dmax_shiftedbeta(l));
+            P2D = apm_calcCopula(u_i, u_l, r, copula_model) + 1 - u_i - u_l;
+            
+            if any(isnan(P2D))
+                warning('CDF (2D) evaluates to NaN');
+                P2D(isnan(P2D)) = 0;
+            end
+            
+            biCum = biCum + P2D;
+        end
+        matRad_progress(i,numel(expDose));
+    end
+
+    % biCum has only the terms from l=i+1 to numel(expDose), 
+    % then we need to add the terms l=i (diagCum) and l from 0 to i-1 (biCum).
+    biCum = diagCum + 2*biCum;
+    
+    expDvh = diagCum ./ numel(expDose);
+
+    stdDvh = sqrt( 1/numel(expDose)^2 * (biCum) - expDvh.^2);
+end
+
+function covDvh = calcCovDvhCopula(expDose,covDose,dAxis,expDvh,copula_model,copula_marginals,dmin_shiftedbeta,dmax_shiftedbeta)
+    nBins = numel(dAxis);
+    covDvh = zeros(nBins);
+    
+    for p = 1:nBins
+        for q = 1:nBins
+            s = 0;
+            for i = 1:numel(expDose)
+                mean_i = expDose(i);
+                sig_i = sqrt(covDose(i,i));
+                for l = 1:numel(expDose)
+                    mean_l = expDose(l);
+                    sig_l = sqrt(covDose(l,l));
+                    r = covDose(i,l) / (sig_i*sig_l);
+                    u_i = apm_calcCdfDose(dAxis(p), mean_i, sig_i, copula_marginals(i),0,dmin_shiftedbeta(i),dmax_shiftedbeta(i));
+                    u_l = apm_calcCdfDose(dAxis(q), mean_l, sig_l, copula_marginals(l),0,dmin_shiftedbeta(l),dmax_shiftedbeta(l));
+                    s = s + apm_calcCopula(u_i, u_l, r, copula_model) + 1 - u_i - u_l;
+                end
+            end
+            
+            covDvh(p,q) = s;
+        end
+        matRad_progress(p,nBins);
+    end
+    covDvh = 1/numel(expDose)^2 * covDvh;
+    covDvh = covDvh - transpose(expDvh)*expDvh;
+end
+
+
 function [expDvh,stdDvh] = probDVHGaussExpStd(expDose,covDose,dAxis)
     nBins = numel(dAxis);
     biCum = zeros(1,nBins);
@@ -175,7 +284,6 @@ function [expDvh,stdDvh] = probDVHGaussExpStd(expDose,covDose,dAxis)
             
             r = covDose(i,l) / (sig_i*sig_l);
             P2D = arrayfun(@(dParam) bvn((dParam - expDose(i)) / sig_i,Inf,(dParam - expDose(l)) / sig_l,Inf,r),dAxis);
-            %P2D = arrayfun(@(dParam) mexBVNcdf(-[dParam dParam],-[expDose(i) expDose(l)],[covDose(i,i) covDose(i,l); covDose(l,i) covDose(l,l)]),dAxis);
             
             if any(isnan(P2D))
                 warn('CDF (2D) evaluates to NaN');
@@ -186,11 +294,14 @@ function [expDvh,stdDvh] = probDVHGaussExpStd(expDose,covDose,dAxis)
         end
         matRad_progress(i,numel(expDose));
     end
+
+    % biCum has only the terms from l=i+1 to numel(expDose), 
+    % then we need to add the terms l=i (diagCum) and l from 0 to i-1 (biCum).
+    biCum = diagCum + 2*biCum;
     
     expDvh = diagCum ./ numel(expDose);
-    stdDvh = 1/numel(expDose)^2 * (diagCum + 2*biCum);
 
-    stdDvh = sqrt(stdDvh - expDvh.^2);
+    stdDvh = sqrt( 1/numel(expDose)^2 * (biCum) - expDvh.^2);
 end
 
 function covDvh = calcCovDvhGauss(expDose,covDose,dAxis,expDvh)
@@ -214,5 +325,85 @@ function covDvh = calcCovDvhGauss(expDose,covDose,dAxis,expDvh)
         matRad_progress(p,nBins);
     end
     covDvh = 1/numel(expDose)^2 * covDvh;
+    covDvh = covDvh - transpose(expDvh)*expDvh;
+end
+
+
+function [expDvh,stdDvh] = probDVHLnGaussExpStd(expDose,covDose,dAxis)
+    nBins = numel(dAxis);
+    biCum = zeros(1,nBins);
+    diagCum = zeros(1,nBins);
+    
+    %Compute parameters of the lognormal
+    [lnExpDose, lnCovDose] = apm_transformMeanCovarianceToLogNormalParameters(expDose,covDose);
+
+    for i = 1:numel(lnExpDose) %for each voxel
+        lnSig_i = sqrt(lnCovDose(i,i));
+        
+        if ~isreal(lnSig_i) || isnan(lnSig_i)
+            continue;
+        end
+        
+        P1 = 1 - apm_normcdf(log(dAxis),lnExpDose(i)*ones(numel(1,nBins)),lnSig_i*ones(numel(1,nBins)));
+        
+        if any(isnan(P1))
+            warning('CDF evaluates to NaN');
+            P1(isnan(P1)) = 0;
+        end
+        diagCum = diagCum + P1;
+        
+        for l = i+1:numel(lnExpDose)
+            lnSig_l = sqrt(lnCovDose(l,l));
+            
+            if ~isreal(lnSig_l) || isnan(lnSig_l)
+                continue;
+            end
+            
+            r = lnCovDose(i,l) / (lnSig_i*lnSig_l);
+            P2D = arrayfun(@(dParam) bvn((log(dParam) - lnExpDose(i)) / lnSig_i,Inf,(log(dParam) - lnExpDose(l)) / lnSig_l,Inf,r), dAxis);
+            
+            if any(isnan(P2D))
+                warn('CDF (2D) evaluates to NaN');
+                P2D(isnan(P2D)) = 0;
+            end
+            
+            biCum = biCum + P2D;
+        end
+        matRad_progress(i,numel(expDose));
+    end
+
+    % biCum has only the terms from l=i+1 to numel(expDose), 
+    % then we need to add the terms l=i (diagCum) and l from 0 to i-1 (biCum).
+    biCum = diagCum + 2*biCum;
+    
+    expDvh = diagCum ./ numel(lnExpDose);
+
+    stdDvh = sqrt( 1/numel(lnExpDose)^2 * (biCum) - expDvh.^2);
+end
+
+function covDvh = calcCovDvhLnGauss(expDose,covDose,dAxis,expDvh)
+    nBins = numel(dAxis);
+    covDvh = zeros(nBins);
+
+    %Compute parameters of the lognormal
+    [lnExpDose, lnCovDose] = apm_transformMeanCovarianceToLogNormalParameters(expDose,covDose); 
+    
+    for p = 1:nBins
+        for q = 1:nBins
+            s = 0;
+            for i = 1:numel(lnExpDose)
+                lnSig_i = sqrt(lnCovDose(i,i));
+                for l = 1:numel(lnExpDose)
+                    lnSig_l = sqrt(lnCovDose(l,l));
+                    r = lnCovDose(i,l) / (lnSig_i*lnSig_l);
+                    s = s + bvn((log(dAxis(p)) - lnExpDose(i)) / lnSig_i,Inf,(log(dAxis(q)) - lnExpDose(l)) / lnSig_l,inferiorto,r);
+                end
+            end
+            
+            covDvh(p,q) = s;
+        end
+        matRad_progress(p,nBins);
+    end
+    covDvh = 1/numel(lnExpDose)^2 * covDvh;
     covDvh = covDvh - transpose(expDvh)*expDvh;
 end

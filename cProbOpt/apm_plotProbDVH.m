@@ -53,7 +53,7 @@ switch mode
         
         
         %parametric transform
-        [a,b] = apm_transformMeanVarianceToBetaParameters(mu,sig);
+        [a,b] = apm_transformMeanStdToBetaParameters(mu,sig);
         
         aMat = repmat(a,numel(dvSpace),1);
         bMat = repmat(b,numel(dvSpace),1);

@@ -40,7 +40,7 @@ classdef apm_probDvhMaxQuantileConstraint
                 case 'normal'
                     finv = dvExp + dvStd*sqrt(2)*erfinv(2*obj.p - 1);
                     %case 'gamma'
-                    %    [p,b] = apm_transformMeanVarianceToGammaParameters(dvExp,dvStd);
+                    %    [p,b] = apm_transformMeanStdToGammaParameters(dvExp,dvStd);
             end
             
             c = finv-obj.maxV;
