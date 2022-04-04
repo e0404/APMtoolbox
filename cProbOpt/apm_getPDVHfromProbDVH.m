@@ -24,7 +24,7 @@ switch distName
     case 'normal'
         pdvh = arrayfun(@(mu,sigma) getNormalQuantile(mu,sigma,p,trunc),expDvh,stdDvh);
     case 'beta'
-        [a,b] = apm_transformMeanVarianceToBetaParameters(expDvh,stdDvh);
+        [a,b] = apm_transformMeanStdToBetaParameters(expDvh,stdDvh);
         pdvh = arrayfun(@(a,b) getBetaQuantile(a,b,p),a,b);
     otherwise
         error(['Function not implemented for Distributions of type ' distName ]);

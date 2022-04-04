@@ -23,7 +23,7 @@ switch pdf
         %Transform mu and sig to lognormal
         %mu_log = log(mu./sqrt(1 + sig.^2 ./ mu.^2));
         %sig_log = sqrt(log(1 + sig.^2 ./ mu.^2));
-        [mu_log,sig_log] = apm_transformMeanVarianceToLogNormalParameters(mu,sig);
+        [mu_log,sig_log] = apm_transformMeanStdToLogNormalParameters(mu,sig);
         
         %Enjoy the easy lognormal form
         expPowerX = exp(k * mu_log + k^2 * sig_log.^2 / 2); 

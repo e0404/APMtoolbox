@@ -33,7 +33,7 @@ switch true
         end 
     
     case (strcmpi(cdf_model,'beta')==1)
-        [alpha, beta] = apm_transformMeanVarianceToBetaParameters(mu, sigma);
+        [alpha, beta] = apm_transformMeanStdToBetaParameters(mu, sigma);
         if is_upper == 0
             u = betacdf(d, alpha, beta);
         else 
@@ -41,8 +41,8 @@ switch true
         end
     
     case (strcmpi(cdf_model,'shiftedbeta')==1)
-        [mu_prime,sigma_prime] = apm_transformMeanVarianceShiftedBetaToBetaMeanVariance(mu, sigma, dmin, dmax);
-        [alpha,beta] = apm_transformMeanVarianceToBetaParameters(mu_prime, sigma_prime);
+        [mu_prime,sigma_prime] = apm_transformMeanStdShiftedBetaToBetaMeanStd(mu, sigma, dmin, dmax);
+        [alpha,beta] = apm_transformMeanStdToBetaParameters(mu_prime, sigma_prime);
         d_prime = (d - dmin) ./ (dmax - dmin);
         u = zeros(1,numel(d_prime));
         if is_upper == 0
@@ -57,7 +57,7 @@ switch true
         
     
     case (strcmpi(cdf_model,'gamma')==1)
-        [k,theta] = apm_transformMeanVarianceToGammaParameters(mu,sigma);
+        [k,theta] = apm_transformMeanStdToGammaParameters(mu,sigma);
         if is_upper == 0
             u = gamcdf(d, k, theta);
         else 
@@ -65,7 +65,7 @@ switch true
         end
     
     case (strcmpi(cdf_model,'gumbel')==1)
-        [epsilon,alpha] = apm_transformMeanVarianceToGumbelParameters(mu,sigma);
+        [epsilon,alpha] = apm_transformMeanStdToGumbelParameters(mu,sigma);
         if is_upper == 0
             u = evcdf(d, epsilon, alpha);
         else 
