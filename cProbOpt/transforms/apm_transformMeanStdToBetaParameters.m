@@ -1,5 +1,5 @@
-function [alpha,beta] = apm_transformMeanVarianceToBetaParameters(mu,sigma)
-% This function gives alpha and beta parameters for a beta-distributed
+function [alpha,beta] = apm_transformMeanStdToBetaParameters(mu,sigma)
+% Return the parameters alpha and beta for a beta-distributed
 % variable, if their shape parameter is known.
 
 alpha = ((mu .* (1 - mu))./ (sigma.^2) - 1) .* mu;
