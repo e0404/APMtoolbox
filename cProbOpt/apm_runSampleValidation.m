@@ -104,7 +104,8 @@ function [doseSampleS, nS_S] = apm_runSampleValidation(w, axDVH, expDose, stdDos
         axSamples = axes();
         hold(axSamples, 'on');
         for i = 1:nS_S    
-                plot(axSamples,sampDVH_y_v1(i,:),sampDVH_y_v2(i,:),'LineWidth',1);
+            plot(axSamples,sampDVH_x(1,:),sampDVH_y_v1(i,:),'LineWidth',1);
+            plot(axSamples,sampDVH_x(1,:),sampDVH_y_v2(i,:),'LineWidth',1);
         end
         box(axSamples,'on');
         grid(axSamples,'on');
