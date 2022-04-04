@@ -83,7 +83,7 @@ nSamplesTotal = 100;
 samplingMethod = 'fractions'; %'independent'
 showWaitbar = false;
 showScatterPlots = false;
-showAllSampDVHs = true;
+showAllSampDVHs = false;
 showAvgSampDVHs = true;
 saveSampToFile = true;
 
@@ -184,8 +184,6 @@ stdDose = sqrt(varDose);
 for v = 1:numel(vois)
     disp(['Computing nominal and probabilistic DVHs for VOI ' vois(v).name '...']); 
     vois(v).nomDVH = apm_DVH(dose(vois(v).ix),nDvhBins,1.1);
-    expDose(vois(v).ix)
-    covDose(vois(v).ix)
     [vois(v).expDVH,vois(v).stdDVH] = apm_DVHprob(expDose(vois(v).ix),covDose(vois(v).ix,vois(v).ix),nDvhBins,1.1,probDvhMethod,copula_model,copula_marginals(vois(v).ix),dmin_shiftedbeta(vois(v).ix),dmax_shiftedbeta(vois(v).ix));
     %if (v==1)
     %    figure;
